@@ -110,6 +110,16 @@ All require header `x-admin-token: <ADMIN_TOKEN>`, else `401 { error: "Admin aut
 | POST | `/api/admin/kiosks/enroll` | `{ kioskId, displayName, enrollmentToken }` | `201 { kioskId, displayName, token }` (one-time kiosk token). `401` on bad enrollment token or Supabase unconfigured |
 | GET | `/api/admin/overview` | — | `{ kiosks: [{ kioskId, displayName, online, connectedAt? }], jobs: [...last 100, no accessToken/fileUrl], summary: { kiosksOnline, jobsTotal, jobsActive } }` |
 | PATCH | `/api/admin/kiosks/:kioskId` | `{ displayName: "1–80 chars" }` | `{ kioskId, displayName }`. `503` when Supabase unconfigured, `404` when kiosk unknown |
+| GET | `/api/admin/kiosks/:kioskId/printers` | — | `{ kioskId, printers: [{ name, color, duplex, isDefault }] }` (`404` unknown) |
+| PUT | `/api/admin/kiosks/:kioskId/printers` | `{ printers: [...] }` or bare array (max 16) | Replaces the list: names unique, exactly one default (first auto-defaulted). `400`/`404` |
+
+## Printer routing (issue #19)
+
+Kiosks with printers configured route by job options (color jobs → color
+printer, duplex → duplex-capable, else default; `NEW_PRINT_JOB` carries
+`printer` and the daemon prints with `lp -d`). Unconfigured kiosks use the
+legacy CUPS default. A routed printer that CUPS can't see fails the job with
+`PRINTER_OFFLINE` naming it.
 
 ## Status + error-code reference
 

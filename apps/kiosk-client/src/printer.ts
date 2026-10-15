@@ -9,9 +9,22 @@ export interface CupsHealth {
   detail: string;
 }
 
-/** CUPS probe: lpstat must run AND a default destination must exist. */
-export async function checkCups(): Promise<CupsHealth> {
+/** CUPS probe: lpstat must run AND the destination must exist. With a routed
+ * printer name, that printer is checked (`lpstat -p`); otherwise the system
+ * default is required (PRINTER_NO_DEFAULT_DESTINATION). */
+export async function checkCups(printer?: string): Promise<CupsHealth> {
   try {
+    if (printer) {
+      const { stdout } = await execFileAsync("lpstat", ["-p", printer], { timeout: 10_000 });
+      if (/unknown|not found|disabled/i.test(stdout) && !/is idle|is printing|enabled/i.test(stdout)) {
+        return {
+          reachable: true,
+          defaultDestination: null,
+          detail: `PRINTER_OFFLINE: ${printer} not ready — ${stdout.trim().split("\n")[0]}`,
+        };
+      }
+      return { reachable: true, defaultDestination: printer, detail: `printer: ${printer}` };
+    }
     const { stdout } = await execFileAsync("lpstat", ["-d"], { timeout: 10_000 });
     const m = /system default destination:\s*(.+)/i.exec(stdout);
     const dest = m?.[1]?.trim() ?? null;
@@ -32,12 +45,13 @@ export async function checkCups(): Promise<CupsHealth> {
   }
 }
 
-/** Print via `lp` with job title + copies + optional duplex (no driver color flags). */
+/** Print via `lp` with job title + copies + optional duplex (no driver color flags).
+ * Routed jobs print with `-d <printer>` (issue #19). */
 export async function printFile(
   file: string,
-  opts: { title: string; copies: number; duplex: boolean },
+  opts: { title: string; copies: number; duplex: boolean; printer?: string },
 ): Promise<string> {
-  const args = ["-t", opts.title, "-n", String(opts.copies)];
+  const args = [...(opts.printer ? ["-d", opts.printer] : []), "-t", opts.title, "-n", String(opts.copies)];
   if (opts.duplex) args.push("-o", "sides=two-sided-long-edge");
   args.push(file);
   const { stdout } = await execFileAsync("lp", args, { timeout: 30_000 });

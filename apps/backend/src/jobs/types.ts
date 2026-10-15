@@ -16,6 +16,7 @@ export interface JobInput {
   paymentIntentId?: string;
   userId?: string;
   pagesEstimate?: number;
+  printer?: string;
 }
 
 export interface PrintJobRecord extends JobInput {

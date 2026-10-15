@@ -12,6 +12,7 @@ create table if not exists jobs (
   payment_intent_id text,
   user_id text,
   pages_estimate int,
+  printer_name text,
   status text not null,
   history jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
