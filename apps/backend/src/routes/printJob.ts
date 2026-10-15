@@ -7,6 +7,7 @@ import type { Server } from "socket.io";
 import { z } from "zod";
 import { MAX_FILE_BYTES } from "../contracts.js";
 import { createJob, getJob, updateStatus } from "../jobs/jobStore.js";
+import { freeBytes } from "../disk.js";
 import { isKioskOnline } from "../kioskRegistry.js";
 import { emitNewPrintJob } from "../socket.js";
 
@@ -40,6 +41,10 @@ export function createPrintJobRouter(io?: Server): Router {
   const router = Router();
 
   router.post("/upload", (req, res) => {
+    // Fail fast before multer writes: keep room for the biggest allowed file.
+    if (freeBytes("uploads") < MAX_FILE_BYTES) {
+      return res.status(507).json({ error: "Print service is low on disk space, try again later." });
+    }
     upload.single("file")(req, res, (err: unknown) => {
       if (err) {
         const message = err instanceof Error ? err.message : "Upload failed.";
