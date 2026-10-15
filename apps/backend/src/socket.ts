@@ -8,7 +8,7 @@ import {
 } from "./contracts.js";
 import { enrollKiosk, getKioskSettings, setKioskOffline, setKioskOnline } from "./kioskRegistry.js";
 import { hashKioskToken, newKioskToken, verifyKioskToken } from "./kioskAuth.js";
-import { getJob, updateStatus } from "./jobs/jobStore.js";
+import { getJobs } from "./jobs/jobStore.js";
 
 const AUTO_ENROLL = process.env.AUTO_ENROLL_KIOSKS === "true";
 
@@ -42,12 +42,12 @@ function unregisterKiosk(kioskId: string, socket: Socket): void {
   }
 }
 
-export function emitNewPrintJob(
+export async function emitNewPrintJob(
   io: Server,
   job: { printJobId: string; kioskId: string; fileUrl: string; copies: number; color: string; duplex: boolean },
-): void {
+): Promise<void> {
   io.to(kioskRoom(job.kioskId)).emit(SOCKET_EVENTS.NEW_PRINT_JOB, job);
-  const updated = updateStatus(job.printJobId, "SENT_TO_KIOSK");
+  const updated = await getJobs().updateStatus(job.printJobId, "SENT_TO_KIOSK");
   if (updated) {
     io.to(jobRoom(job.printJobId)).emit(SOCKET_EVENTS.JOB_STATUS, {
       printJobId: job.printJobId,
@@ -90,16 +90,19 @@ export function setupSocket(io: Server): void {
       const printJobId = auth.printJobId as string;
       void socket.join(jobRoom(printJobId));
       // Replay history so late joiners still see the full timeline.
-      const job = getJob(printJobId);
-      for (const h of job?.history ?? []) {
-        socket.emit(SOCKET_EVENTS.JOB_STATUS, {
-          printJobId,
-          kioskId: job?.kioskId,
-          event: h.status,
-          message: h.message,
-          at: h.at,
+      void getJobs()
+        .get(printJobId)
+        .then((job) => {
+          for (const h of job?.history ?? []) {
+            socket.emit(SOCKET_EVENTS.JOB_STATUS, {
+              printJobId,
+              kioskId: job?.kioskId,
+              event: h.status,
+              message: h.message,
+              at: h.at,
+            });
+          }
         });
-      }
       return;
     }
 
@@ -116,17 +119,20 @@ export function setupSocket(io: Server): void {
       ) {
         return; // malformed/unknown event — drop.
       }
-      const job = getJob(body.printJobId);
-      if (!job || job.kioskId !== kioskId) return; // unknown job or wrong kiosk — drop.
-      const message = typeof body.message === "string" ? body.message : undefined;
-      const updated = updateStatus(job.printJobId, body.event as PrintJobStatus, message);
-      if (!updated) return;
-      io.to(jobRoom(job.printJobId)).emit(SOCKET_EVENTS.JOB_STATUS, {
-        printJobId: job.printJobId,
-        kioskId,
-        event: body.event,
-        message,
-        at: updated.updatedAt,
+      const store = getJobs();
+      void store.get(body.printJobId).then((job) => {
+        if (!job || job.kioskId !== kioskId) return; // unknown job or wrong kiosk — drop.
+        const message = typeof body.message === "string" ? body.message : undefined;
+        void store.updateStatus(job.printJobId, body.event as PrintJobStatus, message).then((updated) => {
+          if (!updated) return;
+          io.to(jobRoom(job.printJobId)).emit(SOCKET_EVENTS.JOB_STATUS, {
+            printJobId: job.printJobId,
+            kioskId,
+            event: body.event,
+            message,
+            at: updated.updatedAt,
+          });
+        });
       });
     });
 

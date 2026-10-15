@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { listJobs } from "../jobs/jobStore.js";
+import { getJobs } from "../jobs/jobStore.js";
 import { hashKioskToken, newKioskToken } from "../kioskAuth.js";
 import {
   enrollKiosk,
@@ -48,9 +48,9 @@ export function createAdminRouter(): Router {
     return res.status(201).json({ kioskId, displayName, token });
   });
 
-  router.get("/admin/overview", (_req, res) => {
+  router.get("/admin/overview", async (_req, res) => {
     const kiosks = kioskStatuses();
-    const jobs = listJobs().map((j) => {
+    const jobs = (await getJobs().list()).map((j) => {
       const { accessToken: _t, fileUrl: _f, ...safe } = j;
       void _t;
       void _f;

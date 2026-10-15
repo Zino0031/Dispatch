@@ -6,7 +6,7 @@ import multer from "multer";
 import type { Server } from "socket.io";
 import { z } from "zod";
 import { MAX_FILE_BYTES } from "../contracts.js";
-import { createJob, getJob, updateStatus } from "../jobs/jobStore.js";
+import { getJobs } from "../jobs/jobStore.js";
 import { freeBytes } from "../disk.js";
 import { isKioskOnline } from "../kioskRegistry.js";
 import { emitNewPrintJob } from "../socket.js";
@@ -70,7 +70,7 @@ export function createPrintJobRouter(io?: Server): Router {
     });
   });
 
-  router.post("/print-job", (req, res) => {
+  router.post("/print-job", async (req, res) => {
     const parsed = printJobSchema.safeParse(req.body);
     if (!parsed.success) {
       return res
@@ -81,9 +81,10 @@ export function createPrintJobRouter(io?: Server): Router {
     if (!isKioskOnline(kioskId)) {
       return res.status(503).json({ error: "Kiosk offline", kioskId });
     }
-    const job = createJob(parsed.data);
+    const store = getJobs();
+    const job = await store.create(parsed.data);
     if (io) {
-      emitNewPrintJob(io, {
+      await emitNewPrintJob(io, {
         printJobId: job.printJobId,
         kioskId: job.kioskId,
         fileUrl: job.fileUrl,
@@ -91,19 +92,22 @@ export function createPrintJobRouter(io?: Server): Router {
         color: job.color,
         duplex: job.duplex,
       });
-    } else {
-      updateStatus(job.printJobId, "SENT_TO_KIOSK");
+      const current = await store.get(job.printJobId);
+      return res
+        .status(201)
+        .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: current?.status ?? job.status });
     }
+    await store.updateStatus(job.printJobId, "SENT_TO_KIOSK");
     return res
       .status(201)
-      .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: job.status });
+      .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: "SENT_TO_KIOSK" });
   });
 
   // Token-gated read: wrong/missing token or unknown id → 404 (no id oracle).
-  router.get("/print-job/:printJobId", (req, res) => {
-    const job = getJob(req.params.printJobId);
-    const token = req.header("x-print-job-token");
-    if (!job || !token || token !== job.accessToken) {
+  router.get("/print-job/:printJobId", async (req, res) => {
+    const token = req.header("x-print-job-token") ?? "";
+    const job = await getJobs().verifyAccess(req.params.printJobId, token);
+    if (!job) {
       return res.status(404).json({ error: "Print job not found" });
     }
     const { accessToken: _t, fileUrl: _f, ...safe } = job;

@@ -17,8 +17,12 @@
                                            └──────────────┘                              └─────────────┘
 ```
 
-`*` `JobStore` is in-memory (`apps/backend/src/jobs/jobStore.ts`). Supabase stores **kiosk
-credentials/settings only**, not jobs or files (files live on backend disk under `uploads/`).
+`Jobs` go through a `JobRepository` (`apps/backend/src/jobs/`): Supabase/Postgres
+(`jobs` table, raw tokens never persist — `access_token_sha256` only) when
+`SUPABASE_URL` + service-role key are configured, otherwise an ephemeral
+in-memory store (pilot default, no SLA — backend restart loses jobs).
+Supabase additionally stores **kiosk credentials/settings**; files live on
+backend disk under `uploads/` until issue #10 moves storage.
 
 ## 2. Data flow (happy path)
 
