@@ -26,7 +26,8 @@ export function createAdminRouter(): Router {
   const router = Router();
 
   // Single shared admin token, no RBAC in v1 (docs/ARCHITECTURE.md §5).
-  router.use((req, res, next) => {
+  // Scoped to /admin so the file proxy and job routes are unaffected.
+  router.use("/admin", (req, res, next) => {
     if (req.header("x-admin-token") !== ADMIN_TOKEN) {
       return res.status(401).json({ error: "Admin authentication required" });
     }

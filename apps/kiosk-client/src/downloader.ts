@@ -32,7 +32,12 @@ export async function downloadFile(fileUrl: string): Promise<string> {
   const timeout = setTimeout(() => ctrl.abort(), config.downloadTimeoutMs);
   let res: Response;
   try {
-    res = await fetch(url, { signal: ctrl.signal, redirect: "error" });
+    res = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: "error",
+      // Kiosk credential headers for the token-gated file proxy (issue #10).
+      headers: { "x-kiosk-id": config.kioskId, "x-kiosk-token": config.kioskToken },
+    });
   } catch (e) {
     throw new Error(
       `DOCUMENT_DOWNLOAD_FAILED: ${e instanceof Error ? e.message : "fetch failed"}`,

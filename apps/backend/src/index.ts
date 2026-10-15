@@ -5,6 +5,7 @@ import { Server } from "socket.io";
 import { config, isAllowedCorsOrigin } from "./config.js";
 import { enrollKiosk, onlineKiosks, setKioskOnline } from "./kioskRegistry.js";
 import { createAdminRouter } from "./routes/admin.js";
+import { createFilesRouter } from "./routes/files.js";
 import { createPrintJobRouter } from "./routes/printJob.js";
 import { setupSocket } from "./socket.js";
 
@@ -34,8 +35,9 @@ export function createApp(): { app: express.Express; server: HttpServer; io: Ser
   setupSocket(io);
   app.use("/api", createPrintJobRouter(io));
   app.use("/api", createAdminRouter());
-  // Statically served uploads — known gap, token-gated proxy lands in #10.
-  app.use("/uploads", express.static("uploads"));
+  app.use("/api", createFilesRouter());
+  // uploads/ is NEVER statically served (issue #10) — all access goes
+  // through the token-gated GET /api/files/:name proxy above.
 
   return { app, server, io };
 }

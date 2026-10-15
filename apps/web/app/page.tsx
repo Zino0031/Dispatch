@@ -14,6 +14,7 @@ interface Kiosk {
 
 interface UploadedFile {
   fileUrl: string;
+  fileToken: string;
   fileName: string;
   mimeType: string;
   size: number;
