@@ -3,6 +3,7 @@ import { config, saveToken } from "./config.js";
 import { KIOSK_STATUS_EVENTS, SOCKET_EVENTS } from "./contracts.js";
 import { normalizeDocument } from "./documentNormalizer.js";
 import { downloadFile, removeTempFile } from "./downloader.js";
+import { log } from "./logger.js";
 import { checkCups, printFile, waitForCompletion } from "./printer.js";
 
 interface PrintJobPayload {
@@ -46,6 +47,7 @@ async function processJob(job: PrintJobPayload): Promise<void> {
   const temps: string[] = [];
   try {
     status(job.printJobId, "DOWNLOAD_START");
+    log.info("job download started", { kioskId: config.kioskId, printJobId: job.printJobId });
     let file: string | null = null;
     if (config.dryRun) {
       await wait(300);
@@ -54,6 +56,7 @@ async function processJob(job: PrintJobPayload): Promise<void> {
       temps.push(file);
     }
     status(job.printJobId, "DOWNLOAD_COMPLETE");
+    log.info("job download complete", { kioskId: config.kioskId, printJobId: job.printJobId });
     if (!config.dryRun && file) {
       const normalized = await normalizeDocument(file, "");
       if (normalized !== file) {
@@ -78,11 +81,18 @@ async function processJob(job: PrintJobPayload): Promise<void> {
         copies: job.copies,
         duplex: job.duplex,
       });
+      log.info("job submitted to CUPS", {
+        kioskId: config.kioskId,
+        printJobId: job.printJobId,
+        cupsRequestId: requestId,
+      });
       await waitForCompletion(requestId);
     }
     status(job.printJobId, "PRINT_SUCCESS");
+    log.info("job print success", { kioskId: config.kioskId, printJobId: job.printJobId });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Kiosk job failed";
+    log.error("job failed", { kioskId: config.kioskId, printJobId: job.printJobId, error: message });
     const event = /^PRINTER_|PRINTER_USB_TIMEOUT/.test(message) ? "PRINTER_ERROR" : "ERROR";
     status(job.printJobId, event, message);
   } finally {
@@ -100,32 +110,30 @@ function connect(): void {
   });
 
   socket.on("connect", () => {
-    // eslint-disable-next-line no-console
-    console.log(`Kiosk connected: ${config.kioskId}`);
+    log.info("kiosk connected", { kioskId: config.kioskId });
   });
 
   socket.on("connect_error", (err: Error) => {
-    // eslint-disable-next-line no-console
-    console.log(`connect_error (retrying): ${err.message}`);
+    log.warn("kiosk connect_error, retrying", { kioskId: config.kioskId, error: err.message });
   });
 
   socket.on(SOCKET_EVENTS.KIOSK_ENROLLED, (msg: { kioskId: string; token: string }) => {
     saveToken(msg.token);
-    // eslint-disable-next-line no-console
-    console.log(`enrolled as ${msg.kioskId}; token saved to ${config.tokenFile}`);
+    log.info("kiosk enrolled, token saved", { kioskId: msg.kioskId, tokenFile: config.tokenFile });
     if (socket) socket.auth = { role: "kiosk", kioskId: config.kioskId, token: msg.token };
   });
 
   socket.on(SOCKET_EVENTS.NEW_PRINT_JOB, (msg: unknown) => {
     if (!isPrintJobPayload(msg, config.kioskId)) {
-      // eslint-disable-next-line no-console
-      console.log("ignoring invalid job payload");
+      log.warn("ignoring invalid job payload", { kioskId: config.kioskId });
       return;
     }
     if (activeJob !== null) {
+      log.warn("busy, rejecting second job", { kioskId: config.kioskId, printJobId: msg.printJobId, activeJob });
       status(msg.printJobId, "ERROR", "Kiosk is already processing another job");
       return;
     }
+    log.info("job received", { kioskId: config.kioskId, printJobId: msg.printJobId, copies: msg.copies });
     void processJob(msg);
   });
 }

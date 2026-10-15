@@ -7,6 +7,7 @@ import { enrollKiosk, onlineKiosks, setKioskOnline } from "./kioskRegistry.js";
 import { createAdminRouter } from "./routes/admin.js";
 import { createFilesRouter } from "./routes/files.js";
 import { createPrintJobRouter } from "./routes/printJob.js";
+import { log } from "./logger.js";
 import { startRetentionSweeper } from "./retention.js";
 import { setupSocket } from "./socket.js";
 
@@ -54,7 +55,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   startRetentionSweeper();
   const { server } = createApp();
   server.listen(config.PORT, () => {
-    // eslint-disable-next-line no-console
-    console.log(`backend listening on :${config.PORT}`);
+    log.info("backend listening", { port: config.PORT });
   });
 }

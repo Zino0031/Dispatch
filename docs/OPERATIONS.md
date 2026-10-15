@@ -61,7 +61,9 @@ Kiosk logs go to the journal via the systemd unit (`StandardOutput/StandardError
 `journalctl -u kiosk-client -f`, persisted with `Storage=persistent` in journald.
 Backend file-logging deployments: rotate with logrotate, e.g.
 `/var/log/print-kiosk/*.log { daily rotate 14 compress missingok }`.
-Never log tokens (`docs/GUIDELINES.md`).
+Every line is JSON with `kioskId`/`printJobId`/`event` where available — grep one
+`printJobId` across backend + kiosk logs for the full trace. Tokens are
+redacted (`[REDACTED]`) and must never appear (`docs/GUIDELINES.md`).
 
 ## Upload retention
 

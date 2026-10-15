@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getJobs } from "./jobs/jobStore.js";
+import { log } from "./logger.js";
 import { fileNameFromUrl } from "./routes/files.js";
 
 const UPLOAD_DIR = "uploads";
@@ -60,8 +61,7 @@ export async function sweepUploads(dryRun: boolean): Promise<SweepResult> {
     try {
       fs.rmSync(full);
       result.deleted.push(e.name);
-      // eslint-disable-next-line no-console
-      console.log(JSON.stringify({ op: "retention-sweep", file: e.name, deleted: true }));
+      log.info("retention sweep deleted file", { op: "retention-sweep", file: e.name });
     } catch {
       // Best effort per file — next sweep retries.
     }
@@ -82,6 +82,5 @@ export function startRetentionSweeper(): void {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const dryRun = process.argv.includes("--dry-run");
   const result = await sweepUploads(dryRun);
-  // eslint-disable-next-line no-console
-  console.log(JSON.stringify({ dryRun, ...result }, null, 2));
+  log.info("retention sweep finished", { dryRun, ...result });
 }

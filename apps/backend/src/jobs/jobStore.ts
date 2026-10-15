@@ -2,6 +2,7 @@ import type { JobRepository } from "./types.js";
 import { memoryJobs } from "./memoryJobStore.js";
 import { SupabaseJobs } from "./supabaseJobStore.js";
 import { getSupabase } from "../supabase.js";
+import { log } from "../logger.js";
 
 export type { HistoryEntry, JobInput, JobRepository, PrintJobRecord } from "./types.js";
 
@@ -17,8 +18,7 @@ export function getJobs(): JobRepository {
   } else {
     if (!warned) {
       warned = true;
-      // eslint-disable-next-line no-console
-      console.log("jobs: SUPABASE not configured — ephemeral in-memory store (no SLA)");
+      log.warn("jobs: ephemeral in-memory store (no SLA)", { reason: "SUPABASE not configured" });
     }
     repo = memoryJobs;
   }
