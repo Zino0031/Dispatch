@@ -18,6 +18,7 @@ apps/backend/uploads/*
 !apps/backend/uploads/.gitkeep
 apps/kiosk-client/temp/*
 !apps/kiosk-client/temp/.gitkeep
+pilot-data/*
 
 # logs + OS
 *.log
