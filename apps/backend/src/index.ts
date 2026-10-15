@@ -10,6 +10,7 @@ import { createPrintJobRouter } from "./routes/printJob.js";
 import { log } from "./logger.js";
 import { startRetentionSweeper } from "./retention.js";
 import { setupSocket } from "./socket.js";
+import { startWatchdog } from "./watchdog.js";
 
 export function createApp(): { app: express.Express; server: HttpServer; io: Server } {
   const app = express();
@@ -53,7 +54,8 @@ if (process.env.TEST_SEED_KIOSK && process.env.NODE_ENV !== "production") {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   startRetentionSweeper();
-  const { server } = createApp();
+  const { server, io } = createApp();
+  startWatchdog(io);
   server.listen(config.PORT, () => {
     log.info("backend listening", { port: config.PORT });
   });

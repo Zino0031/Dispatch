@@ -51,7 +51,10 @@ backend `GET /health` (`onlineKiosks`) → compare `KIOSK_ID` vs enrolled id →
 **`PRINTER_NO_DEFAULT_DESTINATION`:** on the Mini PC run `npm run health` (names CUPS,
 LibreOffice and disk problems in one command); `lpstat -d`; set default with `lpadmin -d <printer>`; re-send job.
 
-**Stuck `PRINTING_STARTED`:** check `lpstat -o`, CUPS `error_log`, USB cable; jobs auto-cancel after 30 s (`PRINTER_USB_TIMEOUT`).
+**Stuck `PRINTING_STARTED`:** jobs with no progress past `JOB_STUCK_TIMEOUT_MS`
+(default 10 min) are marked `ERROR` by the watchdog (message says whether to
+check the output tray); the kiosk queue advances. Check `lpstat -o`, CUPS
+`error_log`, USB cable; CUPS-level jobs auto-cancel after 30 s (`PRINTER_USB_TIMEOUT`).
 
 **Bad upload (400):** confirm mimetype + ≤50 MB; `.doc` needs `application/msword`, `.docx` the OOXML type.
 

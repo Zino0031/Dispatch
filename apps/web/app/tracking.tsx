@@ -127,6 +127,10 @@ export default function LiveTracking({
   const done = last?.event === "PRINT_SUCCESS";
   const cancelled = last?.event === "CANCELLED";
   const queued = last?.event === "QUEUED" && !cancelled;
+  const stalled =
+    failed &&
+    typeof last?.message === "string" &&
+    /stalled|disconnected mid-print/i.test(last.message);
   const position = typeof last?.position === "number" ? last.position : null;
 
   const cancel = async () => {
@@ -176,9 +180,16 @@ export default function LiveTracking({
       </ol>
       {events.length === 0 && !lost && <p>Waiting for printer updates…</p>}
       {failed && (
-        <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 16px" }}>
-          Send again
-        </button>
+        <>
+          {stalled && (
+            <p style={{ background: "#fff4e0", border: "1px solid #d90", borderRadius: 8, padding: 8 }}>
+              The printer disconnected — check with staff before paying again.
+            </p>
+          )}
+          <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 16px" }}>
+            Send again
+          </button>
+        </>
       )}
       {queued && (
         <button onClick={cancel} disabled={cancelling || !jobToken} style={{ marginTop: 12, padding: "8px 16px" }}>

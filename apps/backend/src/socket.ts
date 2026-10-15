@@ -158,6 +158,11 @@ export function setupSocket(io: Server): void {
       const event = body.event as string;
       void store.get(body.printJobId).then((job) => {
         if (!job || job.kioskId !== kioskId) return; // unknown job or wrong kiosk — drop.
+        // Never overwrite a terminal job (watchdog or completion already closed it).
+        if (TERMINAL.has(job.status)) {
+          log.info("dropping status for terminal job", { kioskId, printJobId: job.printJobId, event });
+          return;
+        }
         const message = typeof body.message === "string" ? body.message : undefined;
         log.info("kiosk status", { kioskId, printJobId: job.printJobId, event });
         void store.updateStatus(job.printJobId, event as PrintJobStatus, message).then((updated) => {
