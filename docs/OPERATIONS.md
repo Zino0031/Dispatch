@@ -34,7 +34,11 @@ backend `CORS_ORIGIN` or on the same LAN, otherwise `/api/kiosks` fetch and user
 3. Get the ID: `npm run identity` (or let MAC fallback apply).
 4. Enroll (pick one): (a) admin API `POST /api/admin/kiosks/enroll` → put `token` in `.env` as `KIOSK_TOKEN`;
    (b) set backend `AUTO_ENROLL_KIOSKS=true` for first boot, then disable it and keep the auto-saved `.kiosk-token`.
-5. `npm run build && npm start` (use systemd with `Restart=always` in production).
+5. `npm run build && npm start` for a smoke test. For production install the unit:
+   `sudo cp systemd/kiosk-client.service /etc/systemd/system/`, edit `WorkingDirectory`,
+   `EnvironmentFile` and `ExecStart` for the Mini PC paths, then
+   `sudo systemctl daemon-reload && sudo systemctl enable --now kiosk-client`.
+   Check `systemctl status kiosk-client` (Restart=always, RestartSec=5).
 6. Verify: backend log shows `Kiosk connected: <id>`; `GET /api/kiosks` lists it; dispatch a job and confirm `PRINT_SUCCESS`.
 
 ## Runbooks
