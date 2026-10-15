@@ -1,17 +1,21 @@
 import { networkInterfaces } from "node:os";
 
-/** Stable machine id from the first non-internal MAC (docs/OPERATIONS.md). */
 export function getHardwareId(): string {
-  for (const ifaces of Object.values(networkInterfaces())) {
-    for (const nic of ifaces ?? []) {
-      if (!nic.internal && nic.mac && nic.mac !== "00:00:00:00:00:00") {
-        return `kiosk-${nic.mac.replace(/:/g, "")}`;
-      }
-    }
+  const interfaces = networkInterfaces();
+  const addresses = Object.values(interfaces).flatMap((items) => items ?? []);
+  const physicalMac = addresses.find(
+    (address) => !address.internal && address.mac && address.mac !== "00:00:00:00:00:00",
+  )?.mac;
+
+  if (!physicalMac) {
+    throw new Error("Could not detect a physical network MAC address");
   }
-  return `kiosk-${process.env.HOSTNAME ?? "unknown"}`;
+
+  return physicalMac.toLowerCase();
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log(getHardwareId());
+if (process.argv[1]?.endsWith("identity.ts")) {
+  console.log(`KIOSK_ID=${getHardwareId()}`);
+  console.log(`KIOSK_NAME=${getHardwareId()}`);
+  console.log("Add this ID to the backend KIOSK_CREDENTIALS map before connecting.");
 }

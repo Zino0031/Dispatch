@@ -1,217 +1,119 @@
-import type { Server, Socket } from "socket.io";
+import type { Server as SocketIOServer, Socket } from "socket.io";
+import { config, jobRoom, kioskRoom } from "./config.js";
+import {
+  isKioskOnline,
+  listOnlineKiosks,
+  onlineKioskCount,
+  registerKiosk,
+  unregisterKiosk,
+  authenticateKiosk,
+  authenticateOrEnrollKiosk,
+} from "./kioskRegistry.js";
 import {
   KIOSK_STATUS_EVENTS,
-  SOCKET_EVENTS,
-  jobRoom,
-  kioskRoom,
-  type PrintJobStatus,
-} from "./contracts.js";
-import { enrollKiosk, getKioskSettings, setKioskOffline, setKioskOnline } from "./kioskRegistry.js";
-import { hashKioskToken, newKioskToken, verifyKioskToken } from "./kioskAuth.js";
-import { getJobs } from "./jobs/jobStore.js";
-import { completeActive, markSent, positionOf, waiting } from "./jobs/queue.js";
-import { log } from "./logger.js";
-import { voidIntent } from "./payments/pricing.js";
+  type KioskStatusEvent,
+  type KioskStatusPayload,
+  type NewPrintJobPayload,
+} from "./types.js";
+import { jobStore } from "./jobs/jobStore.js";
 
-const AUTO_ENROLL = process.env.AUTO_ENROLL_KIOSKS === "true";
-
-interface KioskAuth {
-  role?: string;
-  kioskId?: string;
-  token?: string;
+function isStatusEvent(value: string): value is KioskStatusEvent {
+  return (KIOSK_STATUS_EVENTS as readonly string[]).includes(value);
 }
 
-interface UserAuth {
-  role?: string;
-  printJobId?: string;
-  token?: string;
-}
-
-// Latest socket per kiosk wins; older socket force-disconnected.
-const kioskSockets = new Map<string, Socket>();
-
-function registerKiosk(kioskId: string, socket: Socket): void {
-  const prev = kioskSockets.get(kioskId);
-  if (prev && prev.id !== socket.id) {
-    prev.disconnect(true);
-  }
-  kioskSockets.set(kioskId, socket);
-  setKioskOnline(kioskId);
-}
-
-function unregisterKiosk(kioskId: string, socket: Socket): void {
-  if (kioskSockets.get(kioskId)?.id === socket.id) {
-    kioskSockets.delete(kioskId);
-    setKioskOffline(kioskId);
-  }
-}
-
-const TERMINAL = new Set(["PRINT_SUCCESS", "ERROR", "PRINTER_ERROR"]);
-
-/** Hand a QUEUED job to its kiosk: dequeue, mark active, emit + announce. */
-export async function dispatchToKiosk(
-  io: Server,
-  job: { printJobId: string; kioskId: string; fileUrl: string; copies: number; color: string; duplex: boolean; printer?: string },
-): Promise<void> {
-  markSent(job.kioskId, job.printJobId);
-  io.to(kioskRoom(job.kioskId)).emit(SOCKET_EVENTS.NEW_PRINT_JOB, {
-    printJobId: job.printJobId,
-    kioskId: job.kioskId,
-    fileUrl: job.fileUrl,
-    copies: job.copies,
-    color: job.color,
-    duplex: job.duplex,
-    ...(job.printer ? { printer: job.printer } : {}),
-  });
-  const updated = await getJobs().updateStatus(job.printJobId, "SENT_TO_KIOSK");
-  if (updated) {
-    io.to(jobRoom(job.printJobId)).emit(SOCKET_EVENTS.JOB_STATUS, {
-      printJobId: job.printJobId,
-      kioskId: job.kioskId,
-      event: "SENT_TO_KIOSK",
-      position: 0,
-      at: updated.updatedAt,
-    });
-  }
-}
-
-export async function emitNewPrintJob(
-  io: Server,
-  job: { printJobId: string; kioskId: string; fileUrl: string; copies: number; color: string; duplex: boolean; printer?: string },
-): Promise<void> {
-  return dispatchToKiosk(io, job);
-}
-
-/** Broadcast fresh queue positions to every waiting job room. */
-async function announcePositions(io: Server, kioskId: string): Promise<void> {
-  for (const id of waiting(kioskId)) {
-    const job = await getJobs().get(id);
-    if (!job) continue;
-    io.to(jobRoom(id)).emit(SOCKET_EVENTS.JOB_STATUS, {
-      printJobId: id,
-      kioskId,
-      event: job.status,
-      position: positionOf(kioskId, id),
-      at: job.updatedAt,
-    });
-  }
-}
-
-export function setupSocket(io: Server): void {
+export function attachSocketServer(io: SocketIOServer): void {
   io.use(async (socket, next) => {
-    const auth = socket.handshake.auth as KioskAuth & UserAuth;
-    if (auth.role === "user") {
-      if (!auth.printJobId) return next(new Error("Missing printJobId"));
-      // v1 gap closed (issue #13): job accessToken required, verified hashed.
-      if (!auth.token) return next(new Error("Missing job access token"));
-      const job = await getJobs().verifyAccess(auth.printJobId, auth.token);
-      if (!job) return next(new Error("Invalid job access token"));
-      return next();
-    }
-    // Kiosk role (default).
-    const kioskId = auth.kioskId ?? "";
-    if (!kioskId) return next(new Error("Invalid kiosk credentials"));
-    const settings = getKioskSettings(kioskId);
-    const token = auth.token ?? "";
-    if (!token && AUTO_ENROLL && settings === undefined) {
-      // Auto-enroll on first connect: issue token once, never log it.
-      const fresh = newKioskToken();
-      enrollKiosk(kioskId, kioskId, await hashKioskToken(fresh));
-      socket.emit(SOCKET_EVENTS.KIOSK_ENROLLED, { kioskId, token: fresh });
-      return next();
-    }
-    if (!settings || !token || !(await verifyKioskToken(token, settings.authTokenHash))) {
-      return next(new Error("Invalid kiosk credentials"));
-    }
-    return next();
-  });
+    const auth = socket.handshake.auth as Record<string, unknown>;
+    const role = typeof auth.role === "string" ? auth.role : "kiosk";
 
-  io.on("connection", (socket) => {
-    const auth = socket.handshake.auth as KioskAuth & UserAuth;
-    if (auth.role === "user") {
-      const printJobId = auth.printJobId as string;
-      void socket.join(jobRoom(printJobId));
-      // Replay history so late joiners still see the full timeline.
-      void getJobs()
-        .get(printJobId)
-        .then((job) => {
-          for (const h of job?.history ?? []) {
-            socket.emit(SOCKET_EVENTS.JOB_STATUS, {
-              printJobId,
-              kioskId: job?.kioskId,
-              event: h.status,
-              message: h.message,
-              position: job ? positionOf(job.kioskId, printJobId) : 0,
-              at: h.at,
-            });
-          }
-        });
+    if (role === "user") {
+      const printJobId =
+        typeof auth.printJobId === "string" ? auth.printJobId.trim() : "";
+      if (!printJobId) {
+        next(new Error("printJobId is required for user connections"));
+        return;
+      }
+      socket.data.role = "user";
+      socket.data.printJobId = printJobId;
+      next();
       return;
     }
 
-    const kioskId = (auth as KioskAuth).kioskId as string;
-    void socket.join(kioskRoom(kioskId));
-    registerKiosk(kioskId, socket);
-    log.info("kiosk connected", { kioskId });
+    const kioskId = typeof auth.kioskId === "string" ? auth.kioskId.trim() : "";
+    const token = typeof auth.token === "string" ? auth.token : "";
+    const authentication = kioskId
+      ? await authenticateOrEnrollKiosk(kioskId, token)
+      : { authenticated: false };
+    if (!kioskId || !authentication.authenticated) {
+      next(new Error("Invalid kiosk credentials"));
+      return;
+    }
 
-    socket.on(SOCKET_EVENTS.KIOSK_STATUS, (msg: unknown) => {
-      const body = msg as { printJobId?: unknown; event?: unknown; message?: unknown };
+    socket.data.role = "kiosk";
+    socket.data.kioskId = kioskId;
+    socket.data.issuedToken = authentication.issuedToken;
+    next();
+  });
+
+  io.on("connection", (socket: Socket) => {
+    if (socket.data.role === "user") {
+      const printJobId = socket.data.printJobId as string;
+      void socket.join(jobRoom(printJobId));
+      return;
+    }
+
+    const kioskId = socket.data.kioskId as string;
+    registerKiosk(io, kioskId, socket.id);
+    void socket.join(kioskRoom(kioskId));
+    console.log(`Kiosk connected: ${kioskId} (${socket.id})`);
+    if (socket.data.issuedToken) {
+      socket.emit("KIOSK_ENROLLED", { kioskId, token: socket.data.issuedToken });
+    }
+
+    socket.on("kiosk_status", (payload: KioskStatusPayload) => {
       if (
-        typeof body?.printJobId !== "string" ||
-        typeof body?.event !== "string" ||
-        !(KIOSK_STATUS_EVENTS as readonly string[]).includes(body.event)
+        !payload ||
+        typeof payload.printJobId !== "string" ||
+        !isStatusEvent(payload.event)
       ) {
-        return; // malformed/unknown event — drop.
+        return;
       }
-      const store = getJobs();
-      const event = body.event as string;
-      void store.get(body.printJobId).then((job) => {
-        if (!job || job.kioskId !== kioskId) return; // unknown job or wrong kiosk — drop.
-        // Never overwrite a terminal job (watchdog or completion already closed it).
-        if (TERMINAL.has(job.status)) {
-          log.info("dropping status for terminal job", { kioskId, printJobId: job.printJobId, event });
-          return;
-        }
-        const message = typeof body.message === "string" ? body.message : undefined;
-        log.info("kiosk status", { kioskId, printJobId: job.printJobId, event });
-        void store.updateStatus(job.printJobId, event as PrintJobStatus, message).then((updated) => {
-          if (!updated) return;
-          io.to(jobRoom(job.printJobId)).emit(SOCKET_EVENTS.JOB_STATUS, {
-            printJobId: job.printJobId,
-            kioskId,
-            event,
-            message,
-            position: 0,
-            at: updated.updatedAt,
-          });
-          if (TERMINAL.has(event)) {
-            // Failed prints void the linked test charge automatically.
-            if ((event === "ERROR" || event === "PRINTER_ERROR") && job.paymentIntentId) {
-              if (voidIntent(job.paymentIntentId)) {
-                log.info("payment auto-voided on failed print", {
-                  kioskId,
-                  printJobId: job.printJobId,
-                  paymentIntentId: job.paymentIntentId,
-                });
-              }
-            }
-            // Hand the next queued job to this kiosk (FIFO, issue #12).
-            const nextId = completeActive(kioskId, job.printJobId);
-            void (async () => {
-              if (nextId) {
-                const next = await store.get(nextId);
-                if (next) await dispatchToKiosk(io, next);
-              }
-              await announcePositions(io, kioskId);
-            })();
-          }
-        });
+
+      const job = jobStore.get(payload.printJobId);
+      if (!job || job.kioskId !== kioskId) {
+        return;
+      }
+
+      jobStore.updateStatus(payload.printJobId, payload.event, payload.message);
+
+      io.to(jobRoom(payload.printJobId)).emit("JOB_STATUS", {
+        printJobId: payload.printJobId,
+        kioskId,
+        event: payload.event,
+        message: payload.message,
+        at: new Date().toISOString(),
       });
     });
 
     socket.on("disconnect", () => {
-      unregisterKiosk(kioskId, socket);
-      log.info("kiosk disconnected", { kioskId });
+      unregisterKiosk(kioskId, socket.id);
+      console.log(`Kiosk disconnected: ${kioskId} (${socket.id})`);
     });
   });
 }
+
+export function emitNewPrintJob(
+  io: SocketIOServer,
+  payload: NewPrintJobPayload,
+): void {
+  io.to(kioskRoom(payload.kioskId)).emit("NEW_PRINT_JOB", payload);
+  jobStore.updateStatus(payload.printJobId, "SENT_TO_KIOSK");
+  io.to(jobRoom(payload.printJobId)).emit("JOB_STATUS", {
+    printJobId: payload.printJobId,
+    kioskId: payload.kioskId,
+    event: "SENT_TO_KIOSK",
+    at: new Date().toISOString(),
+  });
+}
+
+export { isKioskOnline, listOnlineKiosks, onlineKioskCount };

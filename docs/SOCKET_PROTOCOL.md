@@ -18,11 +18,9 @@ io(SERVER_URL, { auth: { role: "kiosk", kioskId, token }, transports: ["websocke
 
 ### User (live tracking)
 ```ts
-io(BACKEND_URL, { auth: { role: "user", printJobId, token: accessToken }, transports: ["websocket"] })
+io(BACKEND_URL, { auth: { role: "user", printJobId }, transports: ["websocket"] })
 ```
-- Missing `printJobId` or `token` → `connect_error`. The token is the job
-  `accessToken` from `POST /api/print-job` (verified hashed server-side, never
-  logged, never in URLs). Wrong token → `connect_error` (no oracle).
+- Missing `printJobId` → `connect_error`. No token check in v1 (known gap, see ARCHITECTURE §5).
 - Socket joins `job:{printJobId}` and receives only that job's `JOB_STATUS` events.
 
 ## Events

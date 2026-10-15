@@ -1,99 +1,208 @@
-export interface KioskStatus {
+import type { Server as SocketIOServer } from "socket.io";
+import { randomBytes } from "node:crypto";
+import { config } from "./config.js";
+import type { RegisteredKiosk } from "./types.js";
+import type { KioskSettings } from "./types.js";
+import { getSupabaseAdmin } from "./supabase.js";
+import { hashKioskToken, verifyKioskToken } from "./kioskAuth.js";
+
+const kiosks = new Map<string, RegisteredKiosk>();
+const kioskSettings = new Map<string, KioskSettings>();
+
+export async function hydrateKioskSettings(): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
+
+  const { data, error } = await supabase
+    .from("kiosks")
+    .select("kiosk_id, display_name, auth_token_hash, revoked_at, last_seen_at");
+  if (error) {
+    console.error("Could not load kiosk settings from Supabase:", error.message);
+    return;
+  }
+
+  kioskSettings.clear();
+  for (const setting of data ?? []) {
+    if (typeof setting.auth_token_hash !== "string") continue;
+    kioskSettings.set(setting.kiosk_id, {
+      kioskId: setting.kiosk_id,
+      displayName: setting.display_name,
+      authTokenHash: setting.auth_token_hash,
+      revokedAt: setting.revoked_at ?? undefined,
+      lastSeenAt: setting.last_seen_at ?? undefined,
+    });
+  }
+}
+
+export async function authenticateKiosk(kioskId: string, token: string): Promise<boolean> {
+  const setting = kioskSettings.get(kioskId);
+  if (setting) return !setting.revokedAt && verifyKioskToken(token, setting.authTokenHash);
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return false;
+  const { data, error } = await supabase
+    .from("kiosks")
+    .select("kiosk_id, display_name, auth_token_hash, revoked_at, last_seen_at")
+    .eq("kiosk_id", kioskId)
+    .maybeSingle();
+  if (error || !data || typeof data.auth_token_hash !== "string" || data.revoked_at) return false;
+
+  const valid = verifyKioskToken(token, data.auth_token_hash);
+  if (valid) {
+    kioskSettings.set(kioskId, {
+      kioskId,
+      displayName: data.display_name,
+      authTokenHash: data.auth_token_hash,
+      revokedAt: data.revoked_at ?? undefined,
+      lastSeenAt: data.last_seen_at ?? undefined,
+    });
+    void supabase.from("kiosks").update({ last_seen_at: new Date().toISOString() }).eq("kiosk_id", kioskId);
+  }
+  return valid;
+}
+
+export async function authenticateOrEnrollKiosk(
+  kioskId: string,
+  token: string,
+): Promise<{ authenticated: boolean; issuedToken?: string }> {
+  if (token) return { authenticated: await authenticateKiosk(kioskId, token) };
+  if (!config.autoEnrollKiosks) return { authenticated: false };
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { authenticated: false };
+  const { data: existing, error: lookupError } = await supabase
+    .from("kiosks")
+    .select("display_name, auth_token_hash, revoked_at")
+    .eq("kiosk_id", kioskId)
+    .maybeSingle();
+  if (lookupError || existing?.revoked_at) {
+    return { authenticated: false };
+  }
+
+  const issuedToken = randomBytes(32).toString("base64url");
+  const authTokenHash = hashKioskToken(issuedToken);
+  const { error } = await supabase.from("kiosks").upsert({
+    kiosk_id: kioskId,
+    display_name: existing?.display_name ?? kioskId,
+    auth_token_hash: authTokenHash,
+    revoked_at: null,
+    last_seen_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  if (error) return { authenticated: false };
+
+  await hydrateKioskSettings();
+  return { authenticated: true, issuedToken };
+}
+
+export async function enrollKiosk(
+  kioskId: string,
+  displayName: string,
+  enrollmentToken: string,
+): Promise<string | undefined> {
+  if (enrollmentToken !== config.kioskEnrollmentToken) return undefined;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return undefined;
+
+  const token = randomBytes(32).toString("base64url");
+  const authTokenHash = hashKioskToken(token);
+  const { error } = await supabase.from("kiosks").upsert({
+    kiosk_id: kioskId,
+    display_name: displayName,
+    auth_token_hash: authTokenHash,
+    revoked_at: null,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) return undefined;
+  kioskSettings.set(kioskId, { kioskId, displayName, authTokenHash });
+  return token;
+}
+
+export function registerKiosk(
+  io: SocketIOServer,
+  kioskId: string,
+  socketId: string,
+): void {
+  const existing = kiosks.get(kioskId);
+  if (existing && existing.socketId !== socketId) {
+    io.sockets.sockets.get(existing.socketId)?.disconnect(true);
+  }
+
+  kiosks.set(kioskId, {
+    kioskId,
+    displayName: kioskSettings.get(kioskId)?.displayName ?? kioskId,
+    socketId,
+    connectedAt: new Date(),
+  });
+}
+
+export function unregisterKiosk(kioskId: string, socketId: string): void {
+  const existing = kiosks.get(kioskId);
+  if (existing?.socketId === socketId) {
+    kiosks.delete(kioskId);
+  }
+}
+
+export function isKioskOnline(kioskId: string): boolean {
+  return kiosks.has(kioskId);
+}
+
+export function listOnlineKiosks(): RegisteredKiosk[] {
+  return [...kiosks.values()];
+}
+
+export async function updateKioskSettings(
+  kioskId: string,
+  updates: { displayName?: string },
+): Promise<boolean> {
+  const current = kioskSettings.get(kioskId);
+  if (!current) {
+    return false;
+  }
+
+  const next = {
+    ...current,
+    displayName: updates.displayName ?? current.displayName,
+  };
+  kioskSettings.set(kioskId, next);
+  const registered = kiosks.get(kioskId);
+  if (registered) {
+    registered.displayName = next.displayName;
+  }
+
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    const { error } = await supabase.from("kiosks").upsert({
+      kiosk_id: kioskId,
+      display_name: next.displayName,
+      auth_token_hash: next.authTokenHash,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.error("Could not save kiosk settings to Supabase:", error.message);
+      return false;
+    }
+  }
+  return true;
+}
+
+export function onlineKioskCount(): number {
+  return kiosks.size;
+}
+
+export function kioskStatuses(): Array<{
   kioskId: string;
   displayName: string;
   online: boolean;
   connectedAt?: string;
-}
-
-// Ephemeral online map — entries join kioskSettings in kioskStatuses().
-const online = new Map<string, { connectedAt: string }>();
-
-// Enrolled kiosk settings. In-memory until Supabase persistence (issue #9);
-// Supabase stores kiosk credentials/settings only (docs/ARCHITECTURE.md).
-const settings = new Map<string, { displayName: string; authTokenHash: string }>();
-
-export function setKioskOnline(kioskId: string): void {
-  online.set(kioskId, { connectedAt: new Date().toISOString() });
-}
-
-export function setKioskOffline(kioskId: string): void {
-  online.delete(kioskId);
-}
-
-export function enrollKiosk(kioskId: string, displayName: string, authTokenHash: string): void {
-  settings.set(kioskId, { displayName, authTokenHash });
-}
-
-export function getKioskSettings(
-  kioskId: string,
-): { displayName: string; authTokenHash: string } | undefined {
-  return settings.get(kioskId);
-}
-
-export function renameKiosk(kioskId: string, displayName: string): boolean {
-  const s = settings.get(kioskId);
-  if (!s) return false;
-  settings.set(kioskId, { ...s, displayName });
-  return true;
-}
-
-export interface KioskPrinter {
-  name: string;
-  color: boolean;
-  duplex: boolean;
-  isDefault: boolean;
-}
-
-// Printers per kiosk. Unconfigured kiosks use legacy single-default behavior
-// (lp without -d). Supabase persistence for printers lands with #9 follow-up.
-const printers = new Map<string, KioskPrinter[]>();
-
-export function getPrinters(kioskId: string): KioskPrinter[] {
-  return printers.get(kioskId) ?? [];
-}
-
-export function setPrinters(kioskId: string, list: KioskPrinter[]): void {
-  printers.set(kioskId, list);
-}
-
-/** Route by job options: color jobs need a color printer, duplex jobs a
- * duplex one; fallback to the default. Null when nothing can serve. */
-export function selectPrinter(
-  kioskId: string,
-  opts: { color: "bw" | "color"; duplex: boolean },
-): KioskPrinter | null {
-  const list = getPrinters(kioskId);
-  if (list.length === 0) return null; // legacy path — caller omits -d.
-  const capable = list.filter(
-    (p) => (opts.color === "bw" || p.color) && (!opts.duplex || p.duplex),
-  );
-  if (capable.length > 0) {
-    return capable.find((p) => p.isDefault) ?? capable[0];
-  }
-  return list.find((p) => p.isDefault) ?? list[0] ?? null;
-}
-
-/** Admin overview shape: all known kiosks + online flag (docs/API.md). */
-export function kioskStatuses(): (KioskStatus & { printers: KioskPrinter[] })[] {
-  const ids = new Set([...settings.keys(), ...online.keys()]);
-  return [...ids].map((kioskId) => {
-    const s = settings.get(kioskId);
-    const o = online.get(kioskId);
+}> {
+  return [...kioskSettings.values()].map(({ kioskId, displayName }) => {
+    const registered = kiosks.get(kioskId);
     return {
       kioskId,
-      displayName: s?.displayName ?? kioskId,
-      online: o !== undefined,
-      printers: getPrinters(kioskId),
-      ...(o ? { connectedAt: o.connectedAt } : {}),
+      displayName: registered?.displayName ?? displayName,
+      online: Boolean(registered),
+      connectedAt: registered?.connectedAt.toISOString(),
     };
   });
-}
-
-/** Public listing: online-only kiosks (docs/API.md, docs/PRD.md §5.2). */
-export function onlineKiosks(): KioskStatus[] {
-  return kioskStatuses().filter((k) => k.online);
-}
-
-export function isKioskOnline(kioskId: string): boolean {
-  return online.has(kioskId);
 }

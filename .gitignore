@@ -5,6 +5,7 @@ node_modules/
 dist/
 .next/
 out/
+*.tsbuildinfo
 apps/web/next-env.d.ts
 
 # env + credentials (never commit)
