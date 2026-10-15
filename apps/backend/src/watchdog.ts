@@ -3,6 +3,7 @@ import { SOCKET_EVENTS, jobRoom } from "./contracts.js";
 import { getJobs } from "./jobs/jobStore.js";
 import { completeActive } from "./jobs/queue.js";
 import { log } from "./logger.js";
+import { voidIntent } from "./payments/pricing.js";
 
 // Jobs making no progress past this long are declared stalled: they get a
 // terminal ERROR (so the web never spins forever) and the kiosk queue
@@ -38,6 +39,12 @@ export async function checkStuckJobs(io: Server, now = Date.now()): Promise<stri
     const updated = await store.updateStatus(job.printJobId, "ERROR", message);
     if (!updated) continue;
     fired.push(job.printJobId);
+    if (job.paymentIntentId && voidIntent(job.paymentIntentId)) {
+      log.info("payment auto-voided on stalled job", {
+        kioskId: job.kioskId,
+        printJobId: job.printJobId,
+      });
+    }
     log.warn("watchdog declared job stalled", {
       kioskId: job.kioskId,
       printJobId: job.printJobId,

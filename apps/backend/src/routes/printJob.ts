@@ -11,6 +11,7 @@ import { dequeue, enqueue, isIdle, positionOf } from "../jobs/queue.js";
 import { freeBytes } from "../disk.js";
 import { log } from "../logger.js";
 import { mintFileGrant } from "./files.js";
+import { attachJob, getIntent } from "../payments/pricing.js";
 import { isKioskOnline } from "../kioskRegistry.js";
 import { dispatchToKiosk } from "../socket.js";
 
@@ -38,7 +39,12 @@ const printJobSchema = z.object({
   copies: z.number().int().min(1).max(50),
   color: z.enum(["bw", "color"]),
   duplex: z.boolean(),
+  paymentIntentId: z.string().min(1).optional(),
 });
+
+// No job prints without a confirmed payment intent when enabled (issue #17).
+// Pilot default off; flip REQUIRE_PAYMENT=true with a real provider.
+const REQUIRE_PAYMENT = process.env.REQUIRE_PAYMENT === "true";
 
 export function createPrintJobRouter(io?: Server): Router {
   const router = Router();
@@ -81,13 +87,20 @@ export function createPrintJobRouter(io?: Server): Router {
         .status(400)
         .json({ error: "Invalid print job payload", details: parsed.error.flatten() });
     }
-    const { kioskId } = parsed.data;
+    const { kioskId, paymentIntentId } = parsed.data;
     if (!isKioskOnline(kioskId)) {
       log.warn("dispatch rejected: kiosk offline", { kioskId });
       return res.status(503).json({ error: "Kiosk offline", kioskId });
     }
+    if (REQUIRE_PAYMENT) {
+      const intent = paymentIntentId ? getIntent(paymentIntentId) : undefined;
+      if (!intent || intent.status !== "confirmed") {
+        return res.status(402).json({ error: "Payment required before printing" });
+      }
+    }
     const store = getJobs();
     const job = await store.create(parsed.data);
+    if (paymentIntentId) attachJob(paymentIntentId, job.printJobId);
     // FIFO per kiosk (issue #12): hand over immediately when idle,
     // otherwise hold as QUEUED with a position.
     const ahead = enqueue(job.kioskId, job.printJobId);

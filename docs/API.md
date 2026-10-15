@@ -69,6 +69,19 @@ curl -sS -X POST http://localhost:4000/api/print-job -H 'Content-Type: applicati
 Only `QUEUED` (not yet sent) jobs cancel → `200 { printJobId, status: "CANCELLED" }`.
 Anything else → `409 { error }`; wrong/missing token or unknown id → `404`.
 
+## Payments (test provider, issue #17)
+
+| Method | Path | Body | Success |
+|---|---|---|---|
+| POST | `/api/quote` | `{ copies 1–50, pages 1–1000?, color, duplex }` | `{ copies, pages, color, duplex, unit, total }` (server-priced) |
+| POST | `/api/pay` | same as quote | `201 { paymentIntentId, total, status: "confirmed" }` (NOT a real charge) |
+| GET | `/api/pay/:id` | — | `{ paymentIntentId, total, status, jobId }` |
+| POST | `/api/pay/:id/void` | — | `{ paymentIntentId, status: "voided" }` (404 when unknown/already voided) |
+
+`POST /api/print-job` accepts `paymentIntentId`; with `REQUIRE_PAYMENT=true`
+dispatch without a confirmed intent → `402`. Failed prints auto-void the
+linked intent (also fires on watchdog-stalled jobs).
+
 ## Read a print job (token-gated)
 
 `GET /api/print-job/:printJobId` — header `x-print-job-token: <accessToken>`.

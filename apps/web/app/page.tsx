@@ -45,6 +45,17 @@ export default function Home() {
   const [printJobId, setPrintJobId] = useState<string | null>(null);
   const [jobToken, setJobToken] = useState<string | null>(null);
 
+  const [copies, setCopies] = useState(1);
+  const [color, setColor] = useState<"bw" | "color">("bw");
+  const [duplex, setDuplex] = useState(false);
+  const [pages, setPages] = useState(1);
+  const [quote, setQuote] = useState<{ copies: number; pages: number; color: string; duplex: boolean; unit: number; total: number } | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [intent, setIntent] = useState<string | null>(null);
+  const [intentTotal, setIntentTotal] = useState<number | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setKiosksLoading(true);
     setKiosksError(null);
@@ -87,6 +98,9 @@ export default function Home() {
     setFile(f);
     setFileError(problem);
     setUploaded(null);
+    setQuote(null);
+    setIntent(null);
+    setPayError(null);
   };
 
   const upload = async () => {
@@ -113,6 +127,45 @@ export default function Home() {
     }
   };
 
+  const fetchQuote = async () => {
+    setQuoting(true);
+    setPayError(null);
+    try {
+      const res = await fetch(`${backendUrl()}/api/quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ copies, color, duplex, pages }),
+      });
+      if (!res.ok) throw new Error(`quote failed (${res.status})`);
+      setQuote(await res.json());
+      setIntent(null);
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "Couldn't get a price.");
+    } finally {
+      setQuoting(false);
+    }
+  };
+
+  const pay = async () => {
+    setPaying(true);
+    setPayError(null);
+    try {
+      const res = await fetch(`${backendUrl()}/api/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ copies, color, duplex, pages }),
+      });
+      const data = (await res.json()) as { paymentIntentId?: string; total?: number; error?: string };
+      if (!res.ok) throw new Error(data.error ?? `payment failed (${res.status})`);
+      setIntent(data.paymentIntentId ?? null);
+      setIntentTotal(data.total ?? null);
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "Test payment failed.");
+    } finally {
+      setPaying(false);
+    }
+  };
+
   const send = async () => {
     if (!uploaded || !selected || sending) return;
     setSending(true);
@@ -125,9 +178,10 @@ export default function Home() {
         body: JSON.stringify({
           kioskId: selected,
           fileUrl: uploaded.fileUrl,
-          copies: 1,
-          color: "bw",
-          duplex: false,
+          copies,
+          color,
+          duplex,
+          paymentIntentId: intent ?? undefined,
         }),
       });
       const data = (await res.json()) as { printJobId?: string; accessToken?: string; error?: string };
@@ -243,7 +297,58 @@ export default function Home() {
           )}
           {uploaded && (
             <>
-              <button onClick={send} disabled={sending} style={{ marginTop: 12, padding: "10px 20px", width: "100%" }}>
+              <fieldset style={{ marginTop: 12, padding: 12 }}>
+                <legend>Print options</legend>
+                <label style={{ display: "block", marginBottom: 8 }}>
+                  Copies (1–50)
+                  <input
+                    type="number" min={1} max={50} value={copies}
+                    onChange={(e) => setCopies(Math.min(50, Math.max(1, Number(e.target.value) || 1)))}
+                    style={{ marginLeft: 8, width: 64 }}
+                  />
+                </label>
+                <div style={{ marginBottom: 8 }}>
+                  <button onClick={() => setColor("bw")} aria-pressed={color === "bw"} style={{ marginRight: 8, fontWeight: color === "bw" ? "bold" : "normal" }}>B&W</button>
+                  <button onClick={() => setColor("color")} aria-pressed={color === "color"} style={{ fontWeight: color === "color" ? "bold" : "normal" }}>Color</button>
+                </div>
+                <label style={{ display: "block", marginBottom: 8 }}>
+                  <input type="checkbox" checked={duplex} onChange={(e) => setDuplex(e.target.checked)} /> Double-sided
+                </label>
+                <label style={{ display: "block" }}>
+                  Pages (estimate)
+                  <input
+                    type="number" min={1} value={pages}
+                    onChange={(e) => setPages(Math.max(1, Number(e.target.value) || 1))}
+                    style={{ marginLeft: 8, width: 64 }}
+                  />
+                </label>
+              </fieldset>
+              <section style={{ border: "1px dashed #888", borderRadius: 8, padding: 12, marginTop: 12 }}>
+                <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>Test checkout — no real charge</h3>
+                {!quote && (
+                  <button onClick={fetchQuote} disabled={quoting} style={{ padding: "8px 16px" }}>
+                    {quoting ? "Quoting…" : "Get price"}
+                  </button>
+                )}
+                {quote && (
+                  <>
+                    <p style={{ margin: "0 0 8px" }}>
+                      {quote.copies}×{quote.pages} pages {quote.color}
+                      {quote.duplex ? ", duplex" : ""} = {quote.total} credits ({quote.unit}/page)
+                    </p>
+                    {!intent && (
+                      <button onClick={pay} disabled={paying} style={{ padding: "8px 16px" }}>
+                        {paying ? "Processing test payment…" : `Pay ${quote.total} (Test)`}
+                      </button>
+                    )}
+                  </>
+                )}
+                {intent && (
+                  <p style={{ margin: "8px 0 0" }}>Receipt: paid {intentTotal} (Test) — intent {intent.slice(0, 8)}.</p>
+                )}
+                {payError && <p style={{ color: "#b00" }}>{payError}</p>}
+              </section>
+              <button onClick={send} disabled={sending || !intent} title={intent ? "Send to printer" : "Pay (Test) first"} style={{ marginTop: 12, padding: "10px 20px", width: "100%" }}>
                 {sending ? "Sending…" : "Send to printer"}
               </button>
               {sendError && (

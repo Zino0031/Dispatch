@@ -6,6 +6,7 @@ import { config, isAllowedCorsOrigin } from "./config.js";
 import { enrollKiosk, onlineKiosks, setKioskOnline } from "./kioskRegistry.js";
 import { createAdminRouter } from "./routes/admin.js";
 import { createFilesRouter } from "./routes/files.js";
+import { createPaymentsRouter } from "./payments/router.js";
 import { createPrintJobRouter } from "./routes/printJob.js";
 import { log } from "./logger.js";
 import { startRetentionSweeper } from "./retention.js";
@@ -39,6 +40,7 @@ export function createApp(): { app: express.Express; server: HttpServer; io: Ser
   app.use("/api", createPrintJobRouter(io));
   app.use("/api", createAdminRouter());
   app.use("/api", createFilesRouter());
+  app.use("/api", createPaymentsRouter());
   // uploads/ is NEVER statically served (issue #10) — all access goes
   // through the token-gated GET /api/files/:name proxy above.
 

@@ -11,6 +11,7 @@ interface JobRow {
   copies: number;
   color: "bw" | "color";
   duplex: boolean;
+  payment_intent_id: string | null;
   status: PrintJobStatus;
   history: PrintJobRecord["history"];
   created_at: string;
@@ -30,6 +31,7 @@ function toRecord(row: JobRow): PrintJobRecord {
     copies: row.copies,
     color: row.color,
     duplex: row.duplex,
+    paymentIntentId: row.payment_intent_id ?? undefined,
     status: row.status,
     history: row.history,
     createdAt: row.created_at,
@@ -51,6 +53,7 @@ export class SupabaseJobs implements JobRepository {
       copies: record.copies,
       color: record.color,
       duplex: record.duplex,
+      payment_intent_id: record.paymentIntentId ?? null,
       status: record.status,
       history: record.history,
     });

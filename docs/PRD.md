@@ -74,8 +74,14 @@ tied to desktop sessions and fails when labs are closed.
 
 ## 6. Pricing (test)
 
-`UNIT_PRICE = { bw: 5, color: 20 }`, `total = copies × unit`. Duplex does not change price in v1.
-Checkout is a 1.2 s fake processor (`tapTest`); do not present it as a real charge.
+Per-page test pricing: `total = copies × pages × unit` with `UNIT = { bw: 5, color: 20 }`
+credits/page (`apps/backend/src/payments/pricing.ts`). Server-side `POST /api/quote`
+(prices, never trusts client totals) + `POST /api/pay` (1.2 s test processor —
+do not present as a real charge; web checkout is labelled "Test").
+`REQUIRE_PAYMENT=true` gates dispatch (402 without a confirmed intent);
+failed prints auto-void the linked intent. Page counts are client-estimated
+until upload-time page counting lands; a real provider replaces the test
+confirm/void functions (issue #17).
 
 ## 7. Acceptance criteria
 

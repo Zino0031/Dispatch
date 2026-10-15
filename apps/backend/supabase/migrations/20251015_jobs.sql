@@ -9,6 +9,7 @@ create table if not exists jobs (
   copies int not null check (copies between 1 and 50),
   color text not null check (color in ('bw', 'color')),
   duplex boolean not null default false,
+  payment_intent_id text,
   status text not null,
   history jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
