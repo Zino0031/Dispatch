@@ -24,6 +24,12 @@ interface JobRow {
 interface Overview {
   kiosks: KioskRow[];
   jobs: JobRow[];
+  metrics: {
+    successRate: number | null;
+    errorBreakdown: Record<string, number>;
+    medianUploadToSuccessMs: number | null;
+    perKiosk: { kioskId: string; online: boolean; total: number; success: number; rate: number | null }[];
+  } | null;
   summary: { kiosksOnline: number; jobsTotal: number; jobsActive: number };
 }
 
@@ -86,6 +92,23 @@ export default function Admin() {
   const saveToken = (v: string) => {
     setToken(v);
     localStorage.setItem("admin-token", v);
+  };
+
+  const downloadCsv = async () => {
+    setError(null);
+    try {
+      const res = await fetch(`${backendUrl()}/api/admin/metrics.csv`, { headers: headers() });
+      if (!res.ok) throw new Error(await describeError(res));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "metrics.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "CSV download failed.");
+    }
   };
 
   const enroll = async () => {
@@ -157,6 +180,41 @@ export default function Admin() {
             {overview.summary.kiosksOnline} online · {overview.summary.jobsTotal} jobs (
             {overview.summary.jobsActive} active)
           </p>
+          {overview.metrics && (
+            <section style={{ border: "1px solid #ccc", borderRadius: 8, padding: 12, marginBottom: 12 }}>
+              <h2 style={{ margin: "0 0 8px" }}>Fleet metrics</h2>
+              <p style={{ margin: "0 0 8px" }}>
+                Success rate:{" "}
+                {overview.metrics.successRate === null ? "—" : `${overview.metrics.successRate}%`}
+                {overview.metrics.medianUploadToSuccessMs !== null &&
+                  ` · median upload→success ${(overview.metrics.medianUploadToSuccessMs / 1000).toFixed(1)}s`}
+              </p>
+              {Object.keys(overview.metrics.errorBreakdown).length > 0 && (
+                <ul style={{ margin: "0 0 8px", paddingLeft: 18 }}>
+                  {Object.entries(overview.metrics.errorBreakdown).map(([k, v]) => (
+                    <li key={k}>
+                      <small>
+                        {k}: {v}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <ul style={{ margin: "0 0 8px", paddingLeft: 18 }}>
+                {overview.metrics.perKiosk.map((k) => (
+                  <li key={k.kioskId}>
+                    <small>
+                      {k.kioskId} {k.online ? "●" : "○"} {k.success}/{k.total}
+                      {k.rate !== null ? ` (${k.rate}%)` : ""}
+                    </small>
+                  </li>
+                ))}
+              </ul>
+              <button onClick={downloadCsv} style={{ padding: "8px 16px" }}>
+                Download CSV
+              </button>
+            </section>
+          )}
           <h2>Kiosks</h2>
           <ul style={{ paddingLeft: 18 }}>
             {overview.kiosks.map((k) => (
