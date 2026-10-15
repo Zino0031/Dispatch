@@ -33,9 +33,12 @@ const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms)
 // One job at a time (docs/GUIDELINES.md). Any queueing change must also change
 // the busy-ERROR contract + web messaging (issue #12).
 let activeJob: string | null = null;
+let lastPhase: (typeof KIOSK_STATUS_EVENTS)[number] | null = null;
 let socket: Socket | null = null;
+let everConnected = false;
 
 function status(printJobId: string, event: (typeof KIOSK_STATUS_EVENTS)[number], message?: string): void {
+  lastPhase = event;
   socket?.emit(SOCKET_EVENTS.KIOSK_STATUS, { printJobId, event, message });
 }
 
@@ -111,6 +114,13 @@ function connect(): void {
 
   socket.on("connect", () => {
     log.info("kiosk connected", { kioskId: config.kioskId });
+    // Reconnect reconcile (issue #15): re-emit the last known phase so the
+    // backend sees signs of life and the watchdog doesn't fire. No duplicate
+    // prints — this only reports state, the pipeline keeps running once.
+    if (everConnected && activeJob && lastPhase) {
+      status(activeJob, lastPhase, "kiosk reconnected, resuming");
+    }
+    everConnected = true;
   });
 
   socket.on("connect_error", (err: Error) => {
