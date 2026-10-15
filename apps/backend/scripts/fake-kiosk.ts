@@ -1,44 +1,38 @@
-/** Simulated kiosk for local dev (docs/SOCKET_PROTOCOL.md). */
-import { io } from "socket.io-client";
+import { io as connect } from "socket.io-client";
 
-const SERVER_URL = process.env.SERVER_URL ?? "http://localhost:4000";
-const KIOSK_ID = process.env.KIOSK_ID ?? "kiosk-lab-1";
-const KIOSK_TOKEN = process.env.KIOSK_TOKEN ?? "";
+const serverUrl = process.env.SERVER_URL ?? "http://localhost:4000";
+const kioskId = process.env.KIOSK_ID ?? "kiosk-lab-1";
+const token = process.env.KIOSK_TOKEN ?? "kiosk-lab-1-secret";
 
-const socket = io(SERVER_URL, {
-  auth: { role: "kiosk", kioskId: KIOSK_ID, token: KIOSK_TOKEN },
+const socket = connect(serverUrl, {
+  auth: { role: "kiosk", kioskId, token },
   transports: ["websocket"],
 });
 
-const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
-
 socket.on("connect", () => {
-  console.log(`fake-kiosk connected as ${KIOSK_ID}`);
+  console.log(`Fake kiosk "${kioskId}" connected (${socket.id})`);
 });
 
-socket.on("connect_error", (err: Error) => {
-  console.log(`fake-kiosk connect_error: ${err.message}`);
-  process.exitCode = 1;
+socket.on("connect_error", (error) => {
+  console.error("Connection failed:", error.message);
 });
 
-socket.on("KIOSK_ENROLLED", (msg: unknown) => {
-  console.log("fake-kiosk enrolled:", JSON.stringify(msg));
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+socket.on("NEW_PRINT_JOB", (payload) => {
+  console.log("NEW_PRINT_JOB", JSON.stringify(payload, null, 2));
+  void (async () => {
+    const printJobId = (payload as { printJobId?: unknown }).printJobId;
+    if (typeof printJobId !== "string") return;
+    for (const event of ["DOWNLOAD_START", "DOWNLOAD_COMPLETE", "PRINTING_STARTED"] as const) {
+      socket.emit("kiosk_status", { printJobId, event });
+      await wait(300);
+    }
+    socket.emit("kiosk_status", { printJobId, event: "PRINT_SUCCESS" });
+    console.log(`Completed ${printJobId}`);
+  })();
 });
 
-socket.on(
-  "NEW_PRINT_JOB",
-  async (job: { printJobId: string; kioskId: string; fileUrl: string; copies: number }) => {
-    console.log(`fake-kiosk received job ${job.printJobId} (${job.copies} copies)`);
-    const send = (event: string): void => {
-      socket.emit("kiosk_status", { printJobId: job.printJobId, event });
-    };
-    send("DOWNLOAD_START");
-    await wait(300);
-    send("DOWNLOAD_COMPLETE");
-    await wait(300);
-    send("PRINTING_STARTED");
-    await wait(500);
-    send("PRINT_SUCCESS");
-    console.log(`fake-kiosk completed job ${job.printJobId}`);
-  },
-);
+socket.on("disconnect", (reason) => {
+  console.log("Disconnected:", reason);
+});

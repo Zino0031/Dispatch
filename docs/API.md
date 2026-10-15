@@ -16,23 +16,12 @@ Base URL: `PUBLIC_URL` (dev `http://localhost:4000`). JSON limit `1mb`, except m
 - Accepted mimetypes: `application/pdf, image/jpeg, image/png, application/msword,
   application/vnd.openxmlformats-officedocument.wordprocessingml.document` (`routes/printJob.ts:13-19`)
 - Max 50 MB → multer rejects larger with an error; missing/unsupported → `400 { error }`.
-- Stored as `uploads/<uuid>.<lowercased-ext>`, served ONLY via the token-gated
-  `GET /api/files/:name` proxy (never statically — issue #10).
-- Upload grants preview BEFORE dispatch: `fileToken` (15 min) as `?token=` or
-  `x-file-token`. After dispatch, the job's `x-print-job-token` or the kiosk's
-  `x-kiosk-id` + `x-kiosk-token` headers authorize. Anything else → 404.
+- Stored as `uploads/<uuid>.<lowercased-ext>`, served at `/uploads/*`.
 
 ```bash
 curl -sS -X POST http://localhost:4000/api/upload -F 'file=@sample.pdf'
-# 201 { "fileUrl": "http://localhost:4000/api/files/<uuid>.pdf", "fileToken": "<hex>", "fileName": "...", "mimeType": "...", "size": 12345 }
+# 201 { "fileUrl": "http://localhost:4000/uploads/<uuid>.pdf", "fileName": "...", "mimeType": "...", "size": 12345 }
 ```
-
-## Download a file (token-gated)
-
-`GET /api/files/:name` — filename must match `uploads/<uuid>.<ext>` (else 404).
-Needs one of: `?token=<fileToken>` / `x-file-token`, `x-print-job-token` of a
-job referencing the file, or kiosk credentials (`x-kiosk-id` + `x-kiosk-token`)
-for a kiosk with a job on the file. All failures → `404 { error }` (no oracle).
 
 ## List online kiosks (public)
 
@@ -50,11 +39,6 @@ Offline kiosks are filtered out here (admin overview shows all — see below).
 
 Constraints: `kioskId` non-empty; `fileUrl` valid URL; `copies` int 1–50; `color` `bw|color`; `duplex` bool.
 
-Per-kiosk FIFO queue (issue #12): the first job for an idle kiosk dispatches
-immediately (`SENT_TO_KIOSK, position 0`); further jobs hold as `QUEUED` with
-`position` = jobs ahead (0 = with the kiosk). Terminal kiosk status hands the
-next queued job over automatically. `JOB_STATUS` events carry `position`.
-
 ```bash
 curl -sS -X POST http://localhost:4000/api/print-job -H 'Content-Type: application/json' \
   -d '{"kioskId":"kiosk-lab-1","fileUrl":"https://example.com/sample.pdf","copies":1,"color":"bw","duplex":false}'
@@ -62,36 +46,6 @@ curl -sS -X POST http://localhost:4000/api/print-job -H 'Content-Type: applicati
 # offline: 503 { "error": "Kiosk offline", "kioskId": "kiosk-lab-1" }
 # invalid: 400 { "error": "Invalid print job payload", "details": { ...zod flatten... } }
 ```
-
-## Cancel a queued print job
-
-`DELETE /api/print-job/:printJobId` — header `x-print-job-token: <accessToken>`.
-Only `QUEUED` (not yet sent) jobs cancel → `200 { printJobId, status: "CANCELLED" }`.
-Anything else → `409 { error }`; wrong/missing token or unknown id → `404`.
-
-## Payments (test provider, issue #17)
-
-| Method | Path | Body | Success |
-|---|---|---|---|
-| POST | `/api/quote` | `{ copies 1–50, pages 1–1000?, color, duplex }` | `{ copies, pages, color, duplex, unit, total }` (server-priced) |
-| POST | `/api/pay` | same as quote | `201 { paymentIntentId, total, status: "confirmed" }` (NOT a real charge) |
-| GET | `/api/pay/:id` | — | `{ paymentIntentId, total, status, jobId }` |
-| POST | `/api/pay/:id/void` | — | `{ paymentIntentId, status: "voided" }` (404 when unknown/already voided) |
-
-`POST /api/print-job` accepts `paymentIntentId`; with `REQUIRE_PAYMENT=true`
-dispatch without a confirmed intent → `402`. Failed prints auto-void the
-linked intent (also fires on watchdog-stalled jobs).
-
-## Quotas + history (guest codes, issue #18)
-
-Identity is a guest code (`x-user-id` header; campus SSO later). Quota counts
-pages (`copies × pagesEstimate`) in a 30-day window (`QUOTA_PAGES`, default 100);
-`CANCELLED` jobs don't count. Over-quota dispatch → `429 { error }`.
-
-| Method | Path | Auth | Success |
-|---|---|---|---|
-| GET | `/api/users/me/quota` | `x-user-id` (401 without) | `{ userId, quotaPages, usedPages, remainingPages, windowDays }` |
-| GET | `/api/users/me/history` | `x-user-id` | `{ userId, jobs: [...stripped, latest 100] }` |
 
 ## Read a print job (token-gated)
 
@@ -108,19 +62,8 @@ All require header `x-admin-token: <ADMIN_TOKEN>`, else `401 { error: "Admin aut
 | Method | Path | Body | Success |
 |---|---|---|---|
 | POST | `/api/admin/kiosks/enroll` | `{ kioskId, displayName, enrollmentToken }` | `201 { kioskId, displayName, token }` (one-time kiosk token). `401` on bad enrollment token or Supabase unconfigured |
-| GET | `/api/admin/overview` | — | `{ kiosks, jobs (last 100, stripped), metrics (honors ?days=N), summary }` |
-| GET | `/api/admin/metrics.csv` | — | CSV export (no secrets), same `?days=N` window |
+| GET | `/api/admin/overview` | — | `{ kiosks: [{ kioskId, displayName, online, connectedAt? }], jobs: [...last 100, no accessToken/fileUrl], summary: { kiosksOnline, jobsTotal, jobsActive } }` |
 | PATCH | `/api/admin/kiosks/:kioskId` | `{ displayName: "1–80 chars" }` | `{ kioskId, displayName }`. `503` when Supabase unconfigured, `404` when kiosk unknown |
-| GET | `/api/admin/kiosks/:kioskId/printers` | — | `{ kioskId, printers: [{ name, color, duplex, isDefault }] }` (`404` unknown) |
-| PUT | `/api/admin/kiosks/:kioskId/printers` | `{ printers: [...] }` or bare array (max 16) | Replaces the list: names unique, exactly one default (first auto-defaulted). `400`/`404` |
-
-## Printer routing (issue #19)
-
-Kiosks with printers configured route by job options (color jobs → color
-printer, duplex → duplex-capable, else default; `NEW_PRINT_JOB` carries
-`printer` and the daemon prints with `lp -d`). Unconfigured kiosks use the
-legacy CUPS default. A routed printer that CUPS can't see fails the job with
-`PRINTER_OFFLINE` naming it.
 
 ## Status + error-code reference
 

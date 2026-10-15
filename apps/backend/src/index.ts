@@ -1,66 +1,58 @@
-import { createServer, type Server as HttpServer } from "node:http";
 import cors from "cors";
 import express from "express";
-import { Server } from "socket.io";
+import { join } from "node:path";
+import { createServer } from "node:http";
+import { Server as SocketIOServer } from "socket.io";
 import { config, isAllowedCorsOrigin } from "./config.js";
-import { enrollKiosk, onlineKiosks, setKioskOnline } from "./kioskRegistry.js";
-import { createAdminRouter } from "./routes/admin.js";
-import { createFilesRouter } from "./routes/files.js";
-import { createPaymentsRouter } from "./payments/router.js";
 import { createPrintJobRouter } from "./routes/printJob.js";
-import { createUsersRouter } from "./routes/users.js";
-import { log } from "./logger.js";
-import { startRetentionSweeper } from "./retention.js";
-import { setupSocket } from "./socket.js";
-import { startWatchdog } from "./watchdog.js";
+import { createAdminRouter } from "./routes/admin.js";
+import { attachSocketServer, onlineKioskCount } from "./socket.js";
+import { hydrateKioskSettings } from "./kioskRegistry.js";
+import { checkSupabaseConnection } from "./supabase.js";
 
-export function createApp(): { app: express.Express; server: HttpServer; io: Server } {
-  const app = express();
-  app.use(express.json({ limit: "1mb" }));
-  const corsOptions = {
-    origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
-      if (!origin || isAllowedCorsOrigin(origin)) return cb(null, true);
-      return cb(new Error("CORS origin not allowed"));
-    },
-  };
-  app.use(cors(corsOptions));
+const app = express();
+const httpServer = createServer(app);
 
-  app.get("/health", (_req, res) => {
-    res.json({ ok: true, onlineKiosks: onlineKiosks().length });
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: (origin, callback) => callback(null, isAllowedCorsOrigin(origin)),
+    methods: ["GET", "POST"],
+  },
+});
+
+attachSocketServer(io);
+void hydrateKioskSettings();
+
+app.use(cors({ origin: (origin, callback) => callback(null, isAllowedCorsOrigin(origin)) }));
+app.use(express.json({ limit: "1mb" }));
+app.use("/uploads", express.static(join(process.cwd(), "uploads")));
+
+app.get("/health", (_req, res) => {
+  res.json({
+    ok: true,
+    onlineKiosks: onlineKioskCount(),
   });
+});
 
-  // Public kiosk list — online only (admin overview shows all; issue #3).
-  app.get("/api/kiosks", (_req, res) => {
-    res.json({ kiosks: onlineKiosks() });
-  });
+app.get("/health/supabase", async (_req, res) => {
+  res.json(await checkSupabaseConnection());
+});
 
-  // One Node process owns both REST and Socket.io (docs/ARCHITECTURE.md §7).
-  const server = createServer(app);
-  const io = new Server(server, { cors: corsOptions });
-  setupSocket(io);
-  app.use("/api", createPrintJobRouter(io));
-  app.use("/api", createAdminRouter());
-  app.use("/api", createFilesRouter());
-  app.use("/api", createPaymentsRouter());
-  app.use("/api", createUsersRouter());
-  // uploads/ is NEVER statically served (issue #10) — all access goes
-  // through the token-gated GET /api/files/:name proxy above.
+app.use("/api", createPrintJobRouter(io));
+app.use("/api/admin", createAdminRouter());
 
-  return { app, server, io };
-}
+app.use(
+  (
+    err: unknown,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  },
+);
 
-// Dev/test seed: enroll + mark one kiosk online so dispatch 201 is exercisable
-// without a socket kiosk. Never set in production.
-if (process.env.TEST_SEED_KIOSK && process.env.NODE_ENV !== "production") {
-  enrollKiosk(process.env.TEST_SEED_KIOSK, "Test kiosk", "unconfigured");
-  setKioskOnline(process.env.TEST_SEED_KIOSK);
-}
-
-if (import.meta.url === `file://${process.argv[1]}`) {
-  startRetentionSweeper();
-  const { server, io } = createApp();
-  startWatchdog(io);
-  server.listen(config.PORT, () => {
-    log.info("backend listening", { port: config.PORT });
-  });
-}
+httpServer.listen(config.port, () => {
+  console.log(`Print kiosk backend listening on http://localhost:${config.port}`);
+});

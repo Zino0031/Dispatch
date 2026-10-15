@@ -17,12 +17,8 @@
                                            └──────────────┘                              └─────────────┘
 ```
 
-`Jobs` go through a `JobRepository` (`apps/backend/src/jobs/`): Supabase/Postgres
-(`jobs` table, raw tokens never persist — `access_token_sha256` only) when
-`SUPABASE_URL` + service-role key are configured, otherwise an ephemeral
-in-memory store (pilot default, no SLA — backend restart loses jobs).
-Supabase additionally stores **kiosk credentials/settings**; files live on
-backend disk under `uploads/` until issue #10 moves storage.
+`*` `JobStore` is in-memory (`apps/backend/src/jobs/jobStore.ts`). Supabase stores **kiosk
+credentials/settings only**, not jobs or files (files live on backend disk under `uploads/`).
 
 ## 2. Data flow (happy path)
 
@@ -76,8 +72,8 @@ Each transition appends `{ status, message?, errorCode?, at }` to `record.histor
   `verifyKioskToken` uses `timingSafeEqual`. Three issuance paths: admin enroll API, auto-enroll on
   first connect, manual token via env/`tokenFile`.
 - **Admin:** single shared `ADMIN_TOKEN` header (`x-admin-token`). No RBAC in v1.
-- **User/job:** unguessable `accessToken` required as `x-print-job-token` for `GET /print-job/:id`
-  and as `token` in user-socket auth (verified hashed; wrong/missing → `404` / `connect_error`).
+- **User/job:** unguessable `accessToken` required as `x-print-job-token` for `GET /print-job/:id`.
+  The live `JOB_STATUS` channel requires only the `printJobId` (by design for a demo; tighten before production).
 - **Uploads:** unauthenticated static serving. Known gap — see PRD §8.3.
 
 ## 6. Failure modes
@@ -86,7 +82,7 @@ Each transition appends `{ status, message?, errorCode?, at }` to `record.histor
 |---|---|
 | Kiosk offline at dispatch | `503 Kiosk offline`, no job created |
 | Kiosk disconnects mid-job | No timeout/retry; web shows "Live connection lost" on socket drop; job stuck at last status |
-| Busy kiosk gets 2nd job | Held as `QUEUED` with `position` (FIFO, issue #12); kiosk keeps a single-job guard as a safety net (was: immediate busy-`ERROR`) |
+| Busy kiosk gets 2nd job | Immediate `ERROR "Kiosk is already processing another job"` for the 2nd job |
 | CUPS no default printer | `PRINTER_NO_DEFAULT_DESTINATION` → `PRINTER_ERROR` |
 | Download too large / non-HTTP(S) / bad status | `DOCUMENT_DOWNLOAD_FAILED` → `ERROR` |
 | LibreOffice missing (DOC/DOCX) | `DOCUMENT_CONVERSION_FAILED` → `ERROR` |

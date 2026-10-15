@@ -1,24 +1,70 @@
-const PORT = Number(process.env.PORT ?? 4000);
+import "dotenv/config";
 
-const CORS_ORIGIN = (process.env.CORS_ORIGIN ?? "http://localhost:3000")
+function required(name: string, fallback?: string): string {
+  const value = process.env[name] ?? fallback;
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+export const config = {
+  port: Number(process.env.PORT ?? 4000),
+  publicUrl: process.env.PUBLIC_URL ?? "http://localhost:4000",
+  corsOrigin: required("CORS_ORIGIN", "http://localhost:3000"),
+  adminToken: required("ADMIN_TOKEN", "dev-admin-token-change-me"),
+  kioskEnrollmentToken: required(
+    "KIOSK_ENROLLMENT_TOKEN",
+    "dev-enrollment-token-change-me",
+  ),
+  autoEnrollKiosks: process.env.AUTO_ENROLL_KIOSKS === "true",
+  supabaseUrl: process.env.SUPABASE_URL,
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? "print-documents",
+  printDocumentRetentionHours: Number(
+    process.env.PRINT_DOCUMENT_RETENTION_HOURS ?? 24,
+  ),
+};
+
+if (
+  config.supabaseServiceRoleKey &&
+  config.supabaseServiceRoleKey.startsWith("sb_publishable_")
+) {
+  throw new Error(
+    "SUPABASE_SERVICE_ROLE_KEY contains a publishable key. Use the server-only secret key from Supabase Project Settings > API.",
+  );
+}
+
+const extraCorsOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:3000")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 
-const isLocalhost = (origin: string): boolean =>
-  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-
-const isPrivateLan = (origin: string): boolean => {
-  const m = /^https?:\/\/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$/.exec(origin);
+function isPrivateIPv4(host: string): boolean {
+  const m = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (!m) return false;
-  const [a, b] = m[1].split(".").map(Number);
+  const octets = m.slice(1, 5).map(Number);
+  if (octets.some((o) => o < 0 || o > 255)) return false;
+  const [a, b] = octets;
   return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-};
-
-/** Allowlist + localhost + private-LAN origins (docs/OPERATIONS.md). */
-export function isAllowedCorsOrigin(origin: string): boolean {
-  if (!origin) return true;
-  return CORS_ORIGIN.includes(origin) || isLocalhost(origin) || isPrivateLan(origin);
 }
 
-export const config = { PORT, CORS_ORIGIN };
+export function isAllowedCorsOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (extraCorsOrigins.includes(origin)) return true;
+  try {
+    const hostname = new URL(origin).hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") return true;
+    return isPrivateIPv4(hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function kioskRoom(kioskId: string): string {
+  return `kiosk:${kioskId}`;
+}
+
+export function jobRoom(printJobId: string): string {
+  return `job:${printJobId}`;
+}

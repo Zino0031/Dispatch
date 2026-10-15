@@ -1,20 +1,26 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { config } from "./config.js";
 
-let client: SupabaseClient | null | undefined;
+export function getSupabaseAdmin(): SupabaseClient | undefined {
+  if (!config.supabaseUrl || !config.supabaseServiceRoleKey) {
+    return undefined;
+  }
 
-/** Optional admin client — null when unconfigured (docs/ARCHITECTURE.md). */
-export function getSupabase(): SupabaseClient | null {
-  if (client !== undefined) return client;
-  const url = process.env.SUPABASE_URL ?? "";
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  if (!url || !key) {
-    client = null;
-    return client;
-  }
-  // Service-role key only: reject publishable values (docs/GUIDELINES.md).
-  if (key.startsWith("sb_publishable_")) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY must be a secret key, not sb_publishable_");
-  }
-  client = createClient(url, key);
-  return client;
+  return createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+export async function checkSupabaseConnection(): Promise<{
+  configured: boolean;
+  connected: boolean;
+  error?: string;
+}> {
+  const client = getSupabaseAdmin();
+  if (!client) return { configured: false, connected: false };
+
+  const { error } = await client.from("kiosks").select("kiosk_id").limit(1);
+  return error
+    ? { configured: true, connected: false, error: error.message }
+    : { configured: true, connected: true };
 }

@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  outputFileTracingRoot: process.cwd(),
+};
+
 export default nextConfig;
