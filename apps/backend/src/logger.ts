@@ -28,10 +28,8 @@ function emit(level: Level, msg: string, fields: Record<string, unknown> = {}): 
     ...(redact(fields) as Record<string, unknown>),
   });
   if (level === "error") {
-    // eslint-disable-next-line no-console
     console.error(line);
   } else {
-    // eslint-disable-next-line no-console
     console.log(line);
   }
 }

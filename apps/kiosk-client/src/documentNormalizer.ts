@@ -27,6 +27,7 @@ export async function normalizeDocument(tmpPath: string, mimeType: string): Prom
     fs.rmSync(outDir, { recursive: true, force: true });
     throw new Error(
       `DOCUMENT_CONVERSION_FAILED: LibreOffice missing or failed (${e instanceof Error ? e.message.split("\n")[0] : e})`,
+      { cause: e },
     );
   }
   const pdfs = fs.readdirSync(outDir).filter((f) => f.endsWith(".pdf"));
