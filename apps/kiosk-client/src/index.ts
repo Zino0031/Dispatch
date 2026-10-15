@@ -1,7 +1,9 @@
 import { io, type Socket } from "socket.io-client";
 import { config, saveToken } from "./config.js";
 import { KIOSK_STATUS_EVENTS, SOCKET_EVENTS } from "./contracts.js";
+import { normalizeDocument } from "./documentNormalizer.js";
 import { downloadFile, removeTempFile } from "./downloader.js";
+import { checkCups, printFile, waitForCompletion } from "./printer.js";
 
 interface PrintJobPayload {
   printJobId: string;
@@ -36,29 +38,56 @@ function status(printJobId: string, event: (typeof KIOSK_STATUS_EVENTS)[number],
   socket?.emit(SOCKET_EVENTS.KIOSK_STATUS, { printJobId, event, message });
 }
 
-/** DRY_RUN pipeline: emit each status BEFORE the work so a crash leaves an
- * accurate last-status (docs/GUIDELINES.md). Real download → normalize → CUPS
- * lands in issues #6–#8. */
+/** Print pipeline. Each phase emits its status BEFORE the work so a crash
+ * leaves an accurate last-status (docs/GUIDELINES.md). Real path runs when
+ * DRY_RUN=false (provisioned Mini PC, issue #6); DRY_RUN simulates timings. */
 async function processJob(job: PrintJobPayload): Promise<void> {
   activeJob = job.printJobId;
-  let tmp: string | null = null;
+  const temps: string[] = [];
   try {
     status(job.printJobId, "DOWNLOAD_START");
+    let file: string | null = null;
     if (config.dryRun) {
-      await wait(300); // downloader.ts below runs when DRY_RUN=false.
+      await wait(300);
     } else {
-      tmp = await downloadFile(job.fileUrl);
+      file = await downloadFile(job.fileUrl);
+      temps.push(file);
     }
     status(job.printJobId, "DOWNLOAD_COMPLETE");
-    await wait(200); // documentNormalizer.ts (issue #6): LibreOffice DOC→PDF.
+    if (!config.dryRun && file) {
+      const normalized = await normalizeDocument(file, "");
+      if (normalized !== file) {
+        temps.push(normalized);
+        file = normalized;
+      }
+    } else {
+      await wait(200);
+    }
     status(job.printJobId, "PRINTING_STARTED");
-    await wait(400); // printer.ts (issue #8): require default destination, lp, lpstat poll.
+    if (config.dryRun) {
+      await wait(400);
+    } else if (file) {
+      const cups = await checkCups();
+      if (!cups.defaultDestination) {
+        throw new Error(
+          "PRINTER_NO_DEFAULT_DESTINATION: no CUPS default printer — run `lpadmin -d <printer>`",
+        );
+      }
+      const requestId = await printFile(file, {
+        title: `Print Kiosk ${config.kioskId}`,
+        copies: job.copies,
+        duplex: job.duplex,
+      });
+      await waitForCompletion(requestId);
+    }
     status(job.printJobId, "PRINT_SUCCESS");
   } catch (e) {
-    status(job.printJobId, "ERROR", e instanceof Error ? e.message : "Kiosk job failed");
+    const message = e instanceof Error ? e.message : "Kiosk job failed";
+    const event = /^PRINTER_|PRINTER_USB_TIMEOUT/.test(message) ? "PRINTER_ERROR" : "ERROR";
+    status(job.printJobId, event, message);
   } finally {
-    // Temp dir empty after success AND failure (docs/PRD.md §7).
-    if (tmp) removeTempFile(tmp);
+    // Temp dir empty after success AND failure — both raw and converted paths.
+    for (const t of temps) removeTempFile(t);
     activeJob = null;
   }
 }

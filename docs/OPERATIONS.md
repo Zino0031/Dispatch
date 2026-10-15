@@ -48,7 +48,8 @@ backend `CORS_ORIGIN` or on the same LAN, otherwise `/api/kiosks` fetch and user
 **Kiosk offline (503 at dispatch):** check Mini PC power/network → `systemctl status kiosk-client` →
 backend `GET /health` (`onlineKiosks`) → compare `KIOSK_ID` vs enrolled id → re-enroll if token rotated.
 
-**`PRINTER_NO_DEFAULT_DESTINATION`:** `lpstat -d` on the Mini PC; set default with `lpadmin -d <printer>`; re-send job.
+**`PRINTER_NO_DEFAULT_DESTINATION`:** on the Mini PC run `npm run health` (names CUPS,
+LibreOffice and disk problems in one command); `lpstat -d`; set default with `lpadmin -d <printer>`; re-send job.
 
 **Stuck `PRINTING_STARTED`:** check `lpstat -o`, CUPS `error_log`, USB cable; jobs auto-cancel after 30 s (`PRINTER_USB_TIMEOUT`).
 
