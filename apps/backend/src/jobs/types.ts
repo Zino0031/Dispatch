@@ -13,6 +13,7 @@ export interface JobInput {
   copies: number;
   color: "bw" | "color";
   duplex: boolean;
+  paymentIntentId?: string;
 }
 
 export interface PrintJobRecord extends JobInput {

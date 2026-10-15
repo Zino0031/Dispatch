@@ -11,6 +11,7 @@ import { hashKioskToken, newKioskToken, verifyKioskToken } from "./kioskAuth.js"
 import { getJobs } from "./jobs/jobStore.js";
 import { completeActive, markSent, positionOf, waiting } from "./jobs/queue.js";
 import { log } from "./logger.js";
+import { voidIntent } from "./payments/pricing.js";
 
 const AUTO_ENROLL = process.env.AUTO_ENROLL_KIOSKS === "true";
 
@@ -176,6 +177,16 @@ export function setupSocket(io: Server): void {
             at: updated.updatedAt,
           });
           if (TERMINAL.has(event)) {
+            // Failed prints void the linked test charge automatically.
+            if ((event === "ERROR" || event === "PRINTER_ERROR") && job.paymentIntentId) {
+              if (voidIntent(job.paymentIntentId)) {
+                log.info("payment auto-voided on failed print", {
+                  kioskId,
+                  printJobId: job.printJobId,
+                  paymentIntentId: job.paymentIntentId,
+                });
+              }
+            }
             // Hand the next queued job to this kiosk (FIFO, issue #12).
             const nextId = completeActive(kioskId, job.printJobId);
             void (async () => {
