@@ -149,32 +149,32 @@ export default function LiveTracking({
   };
 
   return (
-    <section aria-live="polite" style={{ border: "1px solid #ccc", borderRadius: 8, padding: 16, marginTop: 12 }}>
-      <h2 style={{ fontSize: 18, margin: "0 0 8px" }}>
+    <section aria-live="polite" className="panel">
+      <h2>
         {done ? "Printed ✓" : failed ? "Print failed" : cancelled ? "Cancelled" : "Printing…"}
       </h2>
       {queued && position !== null && position > 0 && (
-        <p style={{ margin: "0 0 8px" }}>
-          Position in queue: #{position + 1} ({position} ahead of you)
+        <p>
+          <span className="pill">Position in queue: #{position + 1}</span> ({position} ahead of you)
         </p>
       )}
       {lost && !done && (
-        <div style={{ border: "1px solid #d33", borderRadius: 8, padding: 12, marginBottom: 12 }}>
-          <p style={{ margin: "0 0 8px" }}>Live connection lost… tap Reconnect to retry.</p>
-          <button onClick={connect} style={{ padding: "8px 16px", marginRight: 8 }}>
+        <div className="panel panel-error" style={{ margin: "0 0 12px" }}>
+          <p>Live connection lost… tap Reconnect to retry.</p>
+          <button className="btn-secondary" onClick={connect} style={{ marginRight: 8 }}>
             Reconnect
           </button>
-          <button onClick={checkStatus} disabled={checking || !jobToken} style={{ padding: "8px 16px" }}>
+          <button className="btn-secondary" onClick={checkStatus} disabled={checking || !jobToken}>
             {checking ? "Checking…" : "Check status"}
           </button>
         </div>
       )}
-      <ol style={{ paddingLeft: 20, margin: 0 }}>
+      <ol className="timeline">
         {events.map((e, i) => (
-          <li key={`${e.event}-${e.at}-${i}`} style={{ marginBottom: 4 }}>
+          <li key={`${e.event}-${e.at}-${i}`}>
             <strong>{labelFor(e.event)}</strong>{" "}
-            <small style={{ color: "#666" }}>{new Date(e.at).toLocaleTimeString()}</small>
-            {e.message && <div style={{ color: failed ? "#b00" : "#333" }}>{e.message}</div>}
+            <time>{new Date(e.at).toLocaleTimeString()}</time>
+            {e.message && <div className={failed ? "msg-error" : "msg"}>{e.message}</div>}
           </li>
         ))}
       </ol>
@@ -182,22 +182,22 @@ export default function LiveTracking({
       {failed && (
         <>
           {stalled && (
-            <p style={{ background: "#fff4e0", border: "1px solid #d90", borderRadius: 8, padding: 8 }}>
+            <p className="notice-amber">
               The printer disconnected — check with staff before paying again.
             </p>
           )}
-          <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 16px" }}>
+          <button className="btn-secondary" onClick={onRetry} style={{ marginTop: 12 }}>
             Send again
           </button>
         </>
       )}
       {queued && (
-        <button onClick={cancel} disabled={cancelling || !jobToken} style={{ marginTop: 12, padding: "8px 16px" }}>
+        <button className="btn-secondary" onClick={cancel} disabled={cancelling || !jobToken} style={{ marginTop: 12 }}>
           {cancelling ? "Cancelling…" : "Cancel this job"}
         </button>
       )}
-      {done && <p style={{ marginBottom: 0 }}>Job {printJobId.slice(0, 8)} complete.</p>}
-      {cancelled && <p style={{ marginBottom: 0 }}>Job cancelled — nothing was printed.</p>}
+      {done && <p>Job <span className="mono">{printJobId.slice(0, 8)}</span> complete.</p>}
+      {cancelled && <p>Job cancelled — nothing was printed.</p>}
       {!live && !done && !failed && !lost && <p>Connection closed.</p>}
     </section>
   );

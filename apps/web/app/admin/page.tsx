@@ -148,28 +148,28 @@ export default function Admin() {
     }
   };
 
-  if (!ready) return <main style={{ padding: 20 }}>Loading…</main>;
+  if (!ready) return <main className="kiosk-main">Loading…</main>;
 
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: 20 }}>
-      <h1 style={{ fontSize: 24 }}>Admin console</h1>
+    <main className="kiosk-main" style={{ maxWidth: 640 }}>
+      <p className="kiosk-eyebrow">Campus print · ops</p>
+      <h1 className="kiosk-h1">Admin console</h1>
 
-      <label style={{ display: "block", marginTop: 12 }}>
+      <label className="field">
         Admin token
         <input
           type="password"
           value={token}
           onChange={(e) => saveToken(e.target.value)}
           placeholder="x-admin-token"
-          style={{ display: "block", marginTop: 4, width: "100%", padding: 8 }}
         />
       </label>
-      <button onClick={refresh} style={{ marginTop: 8, padding: "8px 16px" }}>
+      <button className="btn-secondary" onClick={refresh} style={{ marginTop: 8 }}>
         Load overview
       </button>
 
       {error && (
-        <p aria-live="polite" style={{ color: "#b00" }}>
+        <p aria-live="polite" className="pill pill-error">
           {error}
         </p>
       )}
@@ -181,16 +181,16 @@ export default function Admin() {
             {overview.summary.jobsActive} active)
           </p>
           {overview.metrics && (
-            <section style={{ border: "1px solid #ccc", borderRadius: 8, padding: 12, marginBottom: 12 }}>
-              <h2 style={{ margin: "0 0 8px" }}>Fleet metrics</h2>
-              <p style={{ margin: "0 0 8px" }}>
+            <section className="panel" style={{ marginBottom: 12 }}>
+              <h2>Fleet metrics</h2>
+              <p>
                 Success rate:{" "}
                 {overview.metrics.successRate === null ? "—" : `${overview.metrics.successRate}%`}
                 {overview.metrics.medianUploadToSuccessMs !== null &&
                   ` · median upload→success ${(overview.metrics.medianUploadToSuccessMs / 1000).toFixed(1)}s`}
               </p>
               {Object.keys(overview.metrics.errorBreakdown).length > 0 && (
-                <ul style={{ margin: "0 0 8px", paddingLeft: 18 }}>
+                <ul className="timeline" style={{ margin: "0 0 8px" }}>
                   {Object.entries(overview.metrics.errorBreakdown).map(([k, v]) => (
                     <li key={k}>
                       <small>
@@ -200,46 +200,46 @@ export default function Admin() {
                   ))}
                 </ul>
               )}
-              <ul style={{ margin: "0 0 8px", paddingLeft: 18 }}>
+              <ul className="timeline" style={{ margin: "0 0 8px" }}>
                 {overview.metrics.perKiosk.map((k) => (
                   <li key={k.kioskId}>
-                    <small>
-                      {k.kioskId} {k.online ? "●" : "○"} {k.success}/{k.total}
-                      {k.rate !== null ? ` (${k.rate}%)` : ""}
-                    </small>
+                    {k.kioskId} <span className={k.online ? "pill pill-online" : "pill"}>{k.online ? "●" : "○"}</span> {k.success}/{k.total}
+                    {k.rate !== null ? ` (${k.rate}%)` : ""}
                   </li>
                 ))}
               </ul>
-              <button onClick={downloadCsv} style={{ padding: "8px 16px" }}>
+              <button className="btn-secondary" onClick={downloadCsv}>
                 Download CSV
               </button>
             </section>
           )}
           <h2>Kiosks</h2>
-          <ul style={{ paddingLeft: 18 }}>
+          <ul className="timeline">
             {overview.kiosks.map((k) => (
               <li key={k.kioskId} style={{ marginBottom: 8 }}>
-                <strong>{k.displayName}</strong> <small>({k.kioskId})</small>{" "}
-                <small style={{ color: k.online ? "green" : "#888" }}>
+                <strong>{k.displayName}</strong> <span className="mono">({k.kioskId})</span>{" "}
+                <span className={k.online ? "pill pill-online" : "pill"}>
                   {k.online ? "● online" : "○ offline"}
-                </small>{" "}
+                </span>{" "}
                 {renaming === k.kioskId ? (
                   <>
                     <input
+                      className="num-inline"
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
                       maxLength={80}
-                      style={{ marginLeft: 8, padding: 4 }}
+                      style={{ marginLeft: 8, width: 160 }}
                     />
-                    <button onClick={() => rename(k.kioskId)} style={{ marginLeft: 4 }}>
+                    <button className="btn-ghost" onClick={() => rename(k.kioskId)} style={{ marginLeft: 4 }}>
                       Save
                     </button>
-                    <button onClick={() => setRenaming(null)} style={{ marginLeft: 4 }}>
+                    <button className="btn-ghost" onClick={() => setRenaming(null)} style={{ marginLeft: 4 }}>
                       Cancel
                     </button>
                   </>
                 ) : (
                   <button
+                    className="btn-ghost"
                     onClick={() => {
                       setRenaming(k.kioskId);
                       setRenameValue(k.displayName);
@@ -257,12 +257,11 @@ export default function Admin() {
           {overview.jobs.length === 0 ? (
             <p>No jobs yet.</p>
           ) : (
-            <ul style={{ paddingLeft: 18 }}>
+            <ul className="timeline">
               {overview.jobs.map((j) => (
                 <li key={j.printJobId}>
-                  <small>
-                    {j.printJobId.slice(0, 8)} · {j.kioskId} · {j.copies}×{j.color} · {j.status}
-                  </small>
+                  <span className="mono">{j.printJobId.slice(0, 8)}</span> · {j.kioskId} · {j.copies}×{j.color} ·{" "}
+                  <span className="pill">{j.status}</span>
                 </li>
               ))}
             </ul>
@@ -271,39 +270,45 @@ export default function Admin() {
       )}
 
       <h2>Enroll a kiosk</h2>
-      <input
-        value={enrollId}
-        onChange={(e) => setEnrollId(e.target.value)}
-        placeholder="kiosk-id"
-        style={{ display: "block", marginTop: 4, width: "100%", padding: 8 }}
-      />
-      <input
-        value={enrollName}
-        onChange={(e) => setEnrollName(e.target.value)}
-        placeholder="Display name (location)"
-        maxLength={80}
-        style={{ display: "block", marginTop: 8, width: "100%", padding: 8 }}
-      />
-      <input
-        type="password"
-        value={enrollToken}
-        onChange={(e) => setEnrollToken(e.target.value)}
-        placeholder="Enrollment token (operator secret)"
-        style={{ display: "block", marginTop: 8, width: "100%", padding: 8 }}
-      />
-      <button onClick={enroll} style={{ marginTop: 8, padding: "8px 16px" }}>
+      <label className="field">
+        Kiosk ID
+        <input
+          value={enrollId}
+          onChange={(e) => setEnrollId(e.target.value)}
+          placeholder="kiosk-id"
+        />
+      </label>
+      <label className="field">
+        Display name (location)
+        <input
+          value={enrollName}
+          onChange={(e) => setEnrollName(e.target.value)}
+          placeholder="Display name (location)"
+          maxLength={80}
+        />
+      </label>
+      <label className="field">
+        Enrollment token (operator secret)
+        <input
+          type="password"
+          value={enrollToken}
+          onChange={(e) => setEnrollToken(e.target.value)}
+          placeholder="Enrollment token (operator secret)"
+        />
+      </label>
+      <button className="btn-secondary" onClick={enroll} style={{ marginTop: 8 }}>
         Enroll
       </button>
       {oneTime && (
-        <section style={{ border: "1px solid #2a2", borderRadius: 8, padding: 12, marginTop: 12 }}>
-          <p style={{ margin: "0 0 8px" }}>
+        <section className="panel">
+          <p>
             One-time kiosk token (copy now — it won&apos;t be shown again):
           </p>
-          <code style={{ wordBreak: "break-all" }}>{oneTime}</code>
-          <p style={{ margin: "8px 0 0" }}>
+          <code className="mono" style={{ wordBreak: "break-all" }}>{oneTime}</code>
+          <p style={{ marginTop: 8 }}>
             Save it on the Mini PC as <code>KIOSK_TOKEN</code> in <code>.env</code>.
           </p>
-          <button onClick={() => navigator.clipboard.writeText(oneTime)} style={{ marginTop: 8 }}>
+          <button className="btn-secondary" onClick={() => navigator.clipboard.writeText(oneTime)} style={{ marginTop: 8 }}>
             Copy
           </button>
         </section>

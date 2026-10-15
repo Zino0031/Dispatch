@@ -249,66 +249,64 @@ export default function Home() {
   };
 
   return (
-    <main style={{ maxWidth: 480, margin: "0 auto", padding: 20 }}>
-      <h1 style={{ fontSize: 24, marginBottom: 4 }}>Print Kiosk</h1>
+    <main className="kiosk-main">
+      <p className="kiosk-eyebrow">Campus print</p>
+      <h1 className="kiosk-h1">
+        Print <span className="kiosk-wordmark">Kiosk</span>
+      </h1>
       <p style={{ marginTop: 0 }}>
-        <label>
+        <label className="field">
           Guest code (optional — tracks quota + history)
           <input
             value={guestCode}
             onChange={(e) => saveGuestCode(e.target.value)}
             placeholder="e.g. library card code"
-            style={{ display: "block", marginTop: 4, width: "100%", padding: 8 }}
           />
         </label>
       </p>
 
       {step === "kiosk" && (
         <>
-          <p style={{ color: "#555", marginTop: 0 }}>Step 1 of 6 — pick a printer near you.</p>
+          <p className="kiosk-sub">Step 1 of 6 — pick a printer near you.</p>
           {kiosksLoading && kiosks.length === 0 && <p>Looking for printers…</p>}
           {kiosksError && (
-            <section aria-live="polite" style={{ border: "1px solid #d33", borderRadius: 8, padding: 16, marginTop: 12 }}>
-              <h2 style={{ fontSize: 18, margin: "0 0 8px" }}>Can&apos;t reach the print service</h2>
-              <p style={{ margin: "0 0 12px" }}>{kiosksError} — check your connection and try again.</p>
-              <button onClick={load} style={{ padding: "8px 16px" }}>Retry</button>
+            <section aria-live="polite" className="panel panel-error">
+              <h2>Can&apos;t reach the print service</h2>
+              <p>{kiosksError} — check your connection and try again.</p>
+              <button className="btn-secondary" onClick={load}>Retry</button>
             </section>
           )}
           {!kiosksLoading && !kiosksError && kiosks.length === 0 && (
-            <section aria-live="polite" style={{ border: "1px solid #ccc", borderRadius: 8, padding: 16, marginTop: 12 }}>
-              <h2 style={{ fontSize: 18, margin: "0 0 8px" }}>No printers online right now</h2>
-              <p style={{ margin: "0 0 12px" }}>
+            <section aria-live="polite" className="panel">
+              <h2>No printers online right now</h2>
+              <p>
                 All kiosks in this location are offline. Try again in a moment — the list refreshes
                 automatically — or ask staff for the nearest working printer.
               </p>
-              <button onClick={load} style={{ padding: "8px 16px" }}>Retry now</button>
+              <button className="btn-secondary" onClick={load}>Retry now</button>
             </section>
           )}
           {kiosks.length > 0 && (
-            <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 8 }}>
+            <ul className="kiosk-list">
               {kiosks.map((k) => (
                 <li key={k.kioskId}>
                   <button
+                    className="kiosk-card"
                     onClick={() => setSelected(k.kioskId)}
                     aria-pressed={selected === k.kioskId}
-                    style={{
-                      width: "100%", textAlign: "left", padding: 12, borderRadius: 8,
-                      border: selected === k.kioskId ? "2px solid #111" : "1px solid #ccc",
-                      background: selected === k.kioskId ? "#f5f5f5" : "#fff",
-                    }}
                   >
                     <strong>{k.displayName || k.kioskId}</strong>
                     <br />
-                    <small style={{ color: "green" }}>● online</small>
+                    <span className="pill pill-online">● online</span>
                   </button>
                 </li>
               ))}
             </ul>
           )}
           <button
+            className="btn-primary"
             disabled={!selected}
             title={selected ? "Continue to upload" : "Select a printer to continue"}
-            style={{ marginTop: 16, padding: "10px 20px", width: "100%" }}
             onClick={() => setStep("upload")}
           >
             {selected ? "Continue" : "Select a printer to continue"}
@@ -318,105 +316,104 @@ export default function Home() {
 
       {step === "upload" && (
         <>
-          <p style={{ color: "#555", marginTop: 0 }}>Step 2 of 6 — upload your document.</p>
-          <label style={{ display: "block", marginTop: 12 }}>
+          <p className="kiosk-sub">Step 2 of 6 — upload your document.</p>
+          <label className="field">
             Choose file (PDF, JPG, PNG, DOC, DOCX — max 50 MB)
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-              style={{ display: "block", marginTop: 8 }}
               onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
             />
           </label>
           {file && (
-            <p style={{ margin: "8px 0 0" }}>
+            <p style={{ margin: "8px 0 0", fontSize: 14, color: "var(--ink-muted)" }}>
               Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
             </p>
           )}
           {fileError && (
-            <section aria-live="polite" style={{ border: "1px solid #d33", borderRadius: 8, padding: 12, marginTop: 12 }}>
-              <p style={{ margin: "0 0 8px" }}>{fileError}</p>
-              <button onClick={upload} disabled={uploading} style={{ padding: "8px 16px" }}>
+            <section aria-live="polite" className="panel panel-error">
+              <p>{fileError}</p>
+              <button className="btn-secondary" onClick={upload} disabled={uploading}>
                 {uploading ? "Uploading…" : "Retry upload"}
               </button>
             </section>
           )}
           {file && !fileError && !uploaded && (
-            <button onClick={upload} disabled={uploading} style={{ marginTop: 12, padding: "10px 20px", width: "100%" }}>
+            <button className="btn-primary" onClick={upload} disabled={uploading}>
               {uploading ? "Uploading…" : "Upload"}
             </button>
           )}
           {uploaded && (
-            <section style={{ border: "1px solid #2a2", borderRadius: 8, padding: 12, marginTop: 12 }}>
-              <p style={{ margin: 0 }}>Uploaded: {uploaded.fileName} ({(uploaded.size / 1024).toFixed(0)} KB)</p>
+            <section className="panel">
+              <p>Uploaded: {uploaded.fileName} ({(uploaded.size / 1024).toFixed(0)} KB</p>
             </section>
           )}
           {uploaded && (
             <>
-              <fieldset style={{ marginTop: 12, padding: 12 }}>
-                <legend>Print options</legend>
-                <label style={{ display: "block", marginBottom: 8 }}>
+              <fieldset className="panel" style={{ borderStyle: "solid" }}>
+                <legend style={{ fontSize: 14, padding: "0 8px" }}>Print options</legend>
+                <label className="check-row" style={{ marginTop: 0 }}>
                   Copies (1–50)
                   <input
+                    className="num-inline"
                     type="number" min={1} max={50} value={copies}
                     onChange={(e) => setCopies(Math.min(50, Math.max(1, Number(e.target.value) || 1)))}
-                    style={{ marginLeft: 8, width: 64 }}
                   />
                 </label>
-                <div style={{ marginBottom: 8 }}>
-                  <button onClick={() => setColor("bw")} aria-pressed={color === "bw"} style={{ marginRight: 8, fontWeight: color === "bw" ? "bold" : "normal" }}>B&W</button>
-                  <button onClick={() => setColor("color")} aria-pressed={color === "color"} style={{ fontWeight: color === "color" ? "bold" : "normal" }}>Color</button>
+                <div className="seg" role="group" aria-label="Color mode" style={{ marginBottom: 8 }}>
+                  <button onClick={() => setColor("bw")} aria-pressed={color === "bw"}>B&W</button>
+                  <button onClick={() => setColor("color")} aria-pressed={color === "color"}>Color</button>
                 </div>
-                <label style={{ display: "block", marginBottom: 8 }}>
+                <label className="check-row">
                   <input type="checkbox" checked={duplex} onChange={(e) => setDuplex(e.target.checked)} /> Double-sided
                 </label>
-                <label style={{ display: "block" }}>
+                <label className="check-row" style={{ marginBottom: 0 }}>
                   Pages (estimate)
                   <input
+                    className="num-inline"
                     type="number" min={1} value={pages}
                     onChange={(e) => setPages(Math.max(1, Number(e.target.value) || 1))}
-                    style={{ marginLeft: 8, width: 64 }}
                   />
                 </label>
               </fieldset>
-              <section style={{ border: "1px dashed #888", borderRadius: 8, padding: 12, marginTop: 12 }}>
-                <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>Test checkout — no real charge</h3>
-                {quotaLine && <p style={{ margin: "0 0 8px" }}>Quota: {quotaLine}</p>}
+              <section className="panel">
+                <h2>Test checkout — no real charge</h2>
+                {quotaLine && <p>Quota: {quotaLine}</p>}
                 {!quote && (
-                  <button onClick={fetchQuote} disabled={quoting} style={{ padding: "8px 16px" }}>
+                  <button className="btn-secondary" onClick={fetchQuote} disabled={quoting}>
                     {quoting ? "Quoting…" : "Get price"}
                   </button>
                 )}
                 {quote && (
                   <>
-                    <p style={{ margin: "0 0 8px" }}>
+                    <p>
                       {quote.copies}×{quote.pages} pages {quote.color}
                       {quote.duplex ? ", duplex" : ""} = {quote.total} credits ({quote.unit}/page)
                     </p>
                     {!intent && (
-                      <button onClick={pay} disabled={paying} style={{ padding: "8px 16px" }}>
+                      <button className="btn-secondary" onClick={pay} disabled={paying}>
                         {paying ? "Processing test payment…" : `Pay ${quote.total} (Test)`}
                       </button>
                     )}
                   </>
                 )}
                 {intent && (
-                  <p style={{ margin: "8px 0 0" }}>Receipt: paid {intentTotal} (Test) — intent {intent.slice(0, 8)}.</p>
+                  <p>Receipt: paid {intentTotal} (Test) — intent <span className="mono">{intent.slice(0, 8)}</span>.</p>
                 )}
-                {payError && <p style={{ color: "#b00" }}>{payError}</p>}
+                {payError && <p className="pill pill-error">{payError}</p>}
               </section>
-              <button onClick={send} disabled={sending || !intent} title={intent ? "Send to printer" : "Pay (Test) first"} style={{ marginTop: 12, padding: "10px 20px", width: "100%" }}>
+              <button className="btn-primary" onClick={send} disabled={sending || !intent} title={intent ? "Send to printer" : "Pay (Test) first"}>
                 {sending ? "Sending…" : "Send to printer"}
               </button>
               {sendError && (
-                <section aria-live="polite" style={{ border: "1px solid #d33", borderRadius: 8, padding: 12, marginTop: 12 }}>
-                  <p style={{ margin: "0 0 8px" }}>{sendError}</p>
+                <section aria-live="polite" className="panel panel-error">
+                  <p>{sendError}</p>
                   {kioskWentOffline ? (
-                    <button onClick={() => { setStep("kiosk"); void load(); }} style={{ padding: "8px 16px" }}>
+                    <button className="btn-secondary" onClick={() => { setStep("kiosk"); void load(); }}>
                       Back to printers
                     </button>
                   ) : (
-                    <button onClick={send} disabled={sending} style={{ padding: "8px 16px" }}>
+                    <button className="btn-secondary" onClick={send} disabled={sending}>
                       Try again
                     </button>
                   )}
@@ -424,7 +421,7 @@ export default function Home() {
               )}
             </>
           )}
-          <button onClick={() => setStep("kiosk")} style={{ marginTop: 12, padding: "8px 16px" }}>
+          <button className="btn-ghost" onClick={() => setStep("kiosk")} style={{ marginTop: 12 }}>
             Back
           </button>
         </>

@@ -22,3 +22,7 @@ pilot-data/*
 # logs + OS
 *.log
 .DS_Store
+
+# design verification artifacts
+.playwright-cli/
+*.tsbuildinfo

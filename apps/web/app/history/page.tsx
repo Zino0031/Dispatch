@@ -36,26 +36,28 @@ export default function History() {
   };
 
   return (
-    <main style={{ maxWidth: 480, margin: "0 auto", padding: 20 }}>
-      <h1 style={{ fontSize: 24 }}>Print history</h1>
-      <input
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        placeholder="Guest code"
-        style={{ display: "block", marginTop: 8, width: "100%", padding: 8 }}
-      />
-      <button onClick={load} style={{ marginTop: 8, padding: "8px 16px" }}>
+    <main className="kiosk-main">
+      <p className="kiosk-eyebrow">Campus print</p>
+      <h1 className="kiosk-h1">Print history</h1>
+      <label className="field">
+        Guest code
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="Guest code"
+        />
+      </label>
+      <button className="btn-secondary" onClick={load} style={{ marginTop: 8 }}>
         Show my prints
       </button>
-      {error && <p style={{ color: "#b00" }}>{error}</p>}
+      {error && <p className="pill pill-error">{error}</p>}
       {jobs && jobs.length === 0 && <p>No prints on this code yet.</p>}
       {jobs && jobs.length > 0 && (
-        <ul style={{ paddingLeft: 18 }}>
+        <ul className="timeline" style={{ marginTop: 12 }}>
           {jobs.map((j) => (
             <li key={j.printJobId}>
-              <small>
-                {new Date(j.createdAt).toLocaleString()} · {j.kioskId} · {j.copies}×{j.color} · {j.status}
-              </small>
+              <span className="mono">{new Date(j.createdAt).toLocaleString()}</span> · {j.kioskId} · {j.copies}×{j.color} ·{" "}
+              <span className="pill">{j.status}</span>
             </li>
           ))}
         </ul>
