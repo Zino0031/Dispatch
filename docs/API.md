@@ -82,6 +82,17 @@ Anything else → `409 { error }`; wrong/missing token or unknown id → `404`.
 dispatch without a confirmed intent → `402`. Failed prints auto-void the
 linked intent (also fires on watchdog-stalled jobs).
 
+## Quotas + history (guest codes, issue #18)
+
+Identity is a guest code (`x-user-id` header; campus SSO later). Quota counts
+pages (`copies × pagesEstimate`) in a 30-day window (`QUOTA_PAGES`, default 100);
+`CANCELLED` jobs don't count. Over-quota dispatch → `429 { error }`.
+
+| Method | Path | Auth | Success |
+|---|---|---|---|
+| GET | `/api/users/me/quota` | `x-user-id` (401 without) | `{ userId, quotaPages, usedPages, remainingPages, windowDays }` |
+| GET | `/api/users/me/history` | `x-user-id` | `{ userId, jobs: [...stripped, latest 100] }` |
+
 ## Read a print job (token-gated)
 
 `GET /api/print-job/:printJobId` — header `x-print-job-token: <accessToken>`.

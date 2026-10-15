@@ -12,6 +12,7 @@ import { freeBytes } from "../disk.js";
 import { log } from "../logger.js";
 import { mintFileGrant } from "./files.js";
 import { attachJob, getIntent } from "../payments/pricing.js";
+import { overQuotaBy } from "../users.js";
 import { isKioskOnline } from "../kioskRegistry.js";
 import { dispatchToKiosk } from "../socket.js";
 
@@ -40,6 +41,7 @@ const printJobSchema = z.object({
   color: z.enum(["bw", "color"]),
   duplex: z.boolean(),
   paymentIntentId: z.string().min(1).optional(),
+  pagesEstimate: z.number().int().min(1).max(1000).optional(),
 });
 
 // No job prints without a confirmed payment intent when enabled (issue #17).
@@ -99,7 +101,15 @@ export function createPrintJobRouter(io?: Server): Router {
       }
     }
     const store = getJobs();
-    const job = await store.create(parsed.data);
+    // Guest-code quota (issue #18): 429 with a clear pre-payment block.
+    const userId = req.header("x-user-id")?.trim() || undefined;
+    if (userId) {
+      const over = await overQuotaBy(userId, parsed.data.copies, parsed.data.pagesEstimate ?? 1);
+      if (over !== null) {
+        return res.status(429).json({ error: `Over quota: short ${over} pages for the 30-day window`, userId });
+      }
+    }
+    const job = await store.create({ ...parsed.data, userId });
     if (paymentIntentId) attachJob(paymentIntentId, job.printJobId);
     // FIFO per kiosk (issue #12): hand over immediately when idle,
     // otherwise hold as QUEUED with a position.

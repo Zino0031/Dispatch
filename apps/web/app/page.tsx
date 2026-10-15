@@ -56,6 +56,26 @@ export default function Home() {
   const [intentTotal, setIntentTotal] = useState<number | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
 
+  const [guestCode, setGuestCode] = useState("");
+  const [quotaLine, setQuotaLine] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setGuestCode(localStorage.getItem("guest-code") ?? "");
+    } catch {
+      // Private mode — guest code just won't persist.
+    }
+  }, []);
+
+  const saveGuestCode = (v: string) => {
+    setGuestCode(v);
+    try {
+      localStorage.setItem("guest-code", v);
+    } catch {
+      // ignore
+    }
+  };
+
   const load = useCallback(async () => {
     setKiosksLoading(true);
     setKiosksError(null);
@@ -127,6 +147,27 @@ export default function Home() {
     }
   };
 
+  const fetchQuota = useCallback(async () => {
+    if (!guestCode.trim()) {
+      setQuotaLine(null);
+      return;
+    }
+    try {
+      const res = await fetch(`${backendUrl()}/api/users/me/quota`, {
+        headers: { "x-user-id": guestCode.trim() },
+      });
+      if (!res.ok) throw new Error("quota check failed");
+      const q = (await res.json()) as { remainingPages: number; quotaPages: number };
+      setQuotaLine(`${q.remainingPages} of ${q.quotaPages} pages left (30 days)`);
+    } catch {
+      setQuotaLine(null);
+    }
+  }, [guestCode]);
+
+  useEffect(() => {
+    if (uploaded) void fetchQuota();
+  }, [uploaded, fetchQuota]);
+
   const fetchQuote = async () => {
     setQuoting(true);
     setPayError(null);
@@ -174,13 +215,17 @@ export default function Home() {
     try {
       const res = await fetch(`${backendUrl()}/api/print-job`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(guestCode.trim() ? { "x-user-id": guestCode.trim() } : {}),
+        },
         body: JSON.stringify({
           kioskId: selected,
           fileUrl: uploaded.fileUrl,
           copies,
           color,
           duplex,
+          pagesEstimate: pages,
           paymentIntentId: intent ?? undefined,
         }),
       });
@@ -206,6 +251,17 @@ export default function Home() {
   return (
     <main style={{ maxWidth: 480, margin: "0 auto", padding: 20 }}>
       <h1 style={{ fontSize: 24, marginBottom: 4 }}>Print Kiosk</h1>
+      <p style={{ marginTop: 0 }}>
+        <label>
+          Guest code (optional — tracks quota + history)
+          <input
+            value={guestCode}
+            onChange={(e) => saveGuestCode(e.target.value)}
+            placeholder="e.g. library card code"
+            style={{ display: "block", marginTop: 4, width: "100%", padding: 8 }}
+          />
+        </label>
+      </p>
 
       {step === "kiosk" && (
         <>
@@ -325,6 +381,7 @@ export default function Home() {
               </fieldset>
               <section style={{ border: "1px dashed #888", borderRadius: 8, padding: 12, marginTop: 12 }}>
                 <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>Test checkout — no real charge</h3>
+                {quotaLine && <p style={{ margin: "0 0 8px" }}>Quota: {quotaLine}</p>}
                 {!quote && (
                   <button onClick={fetchQuote} disabled={quoting} style={{ padding: "8px 16px" }}>
                     {quoting ? "Quoting…" : "Get price"}
