@@ -1,6 +1,7 @@
 import { io, type Socket } from "socket.io-client";
 import { config, saveToken } from "./config.js";
 import { KIOSK_STATUS_EVENTS, SOCKET_EVENTS } from "./contracts.js";
+import { downloadFile, removeTempFile } from "./downloader.js";
 
 interface PrintJobPayload {
   printJobId: string;
@@ -40,19 +41,25 @@ function status(printJobId: string, event: (typeof KIOSK_STATUS_EVENTS)[number],
  * lands in issues #6–#8. */
 async function processJob(job: PrintJobPayload): Promise<void> {
   activeJob = job.printJobId;
+  let tmp: string | null = null;
   try {
     status(job.printJobId, "DOWNLOAD_START");
-    await wait(300); // downloader.ts (issue #7): HTTP/S only, caps, 0o600, finally-cleanup.
+    if (config.dryRun) {
+      await wait(300); // downloader.ts below runs when DRY_RUN=false.
+    } else {
+      tmp = await downloadFile(job.fileUrl);
+    }
     status(job.printJobId, "DOWNLOAD_COMPLETE");
     await wait(200); // documentNormalizer.ts (issue #6): LibreOffice DOC→PDF.
     status(job.printJobId, "PRINTING_STARTED");
-    await wait(400); // printer.ts (issues #6, #8): require default destination, lp, lpstat poll.
+    await wait(400); // printer.ts (issue #8): require default destination, lp, lpstat poll.
     status(job.printJobId, "PRINT_SUCCESS");
   } catch (e) {
     status(job.printJobId, "ERROR", e instanceof Error ? e.message : "Kiosk job failed");
   } finally {
+    // Temp dir empty after success AND failure (docs/PRD.md §7).
+    if (tmp) removeTempFile(tmp);
     activeJob = null;
-    // Temp files deleted in finally (docs/PRD.md §5.5) — real paths in #7.
   }
 }
 

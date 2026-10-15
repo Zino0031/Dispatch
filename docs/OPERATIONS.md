@@ -54,6 +54,15 @@ backend `GET /health` (`onlineKiosks`) → compare `KIOSK_ID` vs enrolled id →
 
 **Bad upload (400):** confirm mimetype + ≤50 MB; `.doc` needs `application/msword`, `.docx` the OOXML type.
 
+## Logging
+
+Kiosk logs go to the journal via the systemd unit (`StandardOutput/StandardError=journal`):
+`journalctl -u kiosk-client -f`, persisted with `Storage=persistent` in journald.
+Backend file-logging deployments: rotate with logrotate, e.g.
+`/var/log/print-kiosk/*.log { daily rotate 14 compress missingok }`.
+Never log tokens (`docs/GUIDELINES.md`).
+
 ## Pre-pilot hardening TODO
-systemd unit, CUPS/LibreOffice provision script, disk-space guard on `TEMP_DIR`/`uploads/`,
-log rotation, and a retention sweeper for `uploads/` honoring `PRINT_DOCUMENT_RETENTION_HOURS`.
+~~systemd unit, CUPS/LibreOffice provision script, disk-space guard on `TEMP_DIR`/`uploads/`,
+log rotation~~ (done: issues #5–#7) — remaining: retention sweeper for `uploads/`
+honoring `PRINT_DOCUMENT_RETENTION_HOURS` (issue #11).
