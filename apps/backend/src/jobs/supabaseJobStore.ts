@@ -14,6 +14,7 @@ interface JobRow {
   payment_intent_id: string | null;
   user_id: string | null;
   pages_estimate: number | null;
+  printer_name: string | null;
   status: PrintJobStatus;
   history: PrintJobRecord["history"];
   created_at: string;
@@ -36,6 +37,7 @@ function toRecord(row: JobRow): PrintJobRecord {
     paymentIntentId: row.payment_intent_id ?? undefined,
     userId: row.user_id ?? undefined,
     pagesEstimate: row.pages_estimate ?? undefined,
+    printer: row.printer_name ?? undefined,
     status: row.status,
     history: row.history,
     createdAt: row.created_at,
@@ -60,6 +62,7 @@ export class SupabaseJobs implements JobRepository {
       payment_intent_id: record.paymentIntentId ?? null,
       user_id: record.userId ?? null,
       pages_estimate: record.pagesEstimate ?? null,
+      printer_name: record.printer ?? null,
       status: record.status,
       history: record.history,
     });

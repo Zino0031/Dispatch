@@ -51,10 +51,18 @@ const TERMINAL = new Set(["PRINT_SUCCESS", "ERROR", "PRINTER_ERROR"]);
 /** Hand a QUEUED job to its kiosk: dequeue, mark active, emit + announce. */
 export async function dispatchToKiosk(
   io: Server,
-  job: { printJobId: string; kioskId: string; fileUrl: string; copies: number; color: string; duplex: boolean },
+  job: { printJobId: string; kioskId: string; fileUrl: string; copies: number; color: string; duplex: boolean; printer?: string },
 ): Promise<void> {
   markSent(job.kioskId, job.printJobId);
-  io.to(kioskRoom(job.kioskId)).emit(SOCKET_EVENTS.NEW_PRINT_JOB, job);
+  io.to(kioskRoom(job.kioskId)).emit(SOCKET_EVENTS.NEW_PRINT_JOB, {
+    printJobId: job.printJobId,
+    kioskId: job.kioskId,
+    fileUrl: job.fileUrl,
+    copies: job.copies,
+    color: job.color,
+    duplex: job.duplex,
+    ...(job.printer ? { printer: job.printer } : {}),
+  });
   const updated = await getJobs().updateStatus(job.printJobId, "SENT_TO_KIOSK");
   if (updated) {
     io.to(jobRoom(job.printJobId)).emit(SOCKET_EVENTS.JOB_STATUS, {
@@ -69,7 +77,7 @@ export async function dispatchToKiosk(
 
 export async function emitNewPrintJob(
   io: Server,
-  job: { printJobId: string; kioskId: string; fileUrl: string; copies: number; color: string; duplex: boolean },
+  job: { printJobId: string; kioskId: string; fileUrl: string; copies: number; color: string; duplex: boolean; printer?: string },
 ): Promise<void> {
   return dispatchToKiosk(io, job);
 }

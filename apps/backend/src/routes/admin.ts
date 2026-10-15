@@ -6,8 +6,10 @@ import { hashKioskToken, newKioskToken } from "../kioskAuth.js";
 import {
   enrollKiosk,
   getKioskSettings,
+  getPrinters,
   kioskStatuses,
   renameKiosk,
+  setPrinters,
 } from "../kioskRegistry.js";
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? "change-me-in-production";
@@ -21,6 +23,13 @@ const enrollSchema = z.object({
 
 const renameSchema = z.object({
   displayName: z.string().min(1).max(80),
+});
+
+const printerSchema = z.object({
+  name: z.string().min(1).max(64),
+  color: z.boolean(),
+  duplex: z.boolean(),
+  isDefault: z.boolean(),
 });
 
 export function createAdminRouter(): Router {
@@ -83,6 +92,35 @@ export function createAdminRouter(): Router {
     }
     renameKiosk(req.params.kioskId, parsed.data.displayName);
     return res.json({ kioskId: req.params.kioskId, displayName: parsed.data.displayName });
+  });
+
+  router.get("/admin/kiosks/:kioskId/printers", (req, res) => {
+    if (!getKioskSettings(req.params.kioskId)) {
+      return res.status(404).json({ error: "Kiosk unknown" });
+    }
+    return res.json({ kioskId: req.params.kioskId, printers: getPrinters(req.params.kioskId) });
+  });
+
+  router.put("/admin/kiosks/:kioskId/printers", (req, res) => {
+    if (!getKioskSettings(req.params.kioskId)) {
+      return res.status(404).json({ error: "Kiosk unknown" });
+    }
+    const parsed = z.array(printerSchema).max(16).safeParse(req.body?.printers ?? req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid printers (name/color/duplex/isDefault)" });
+    }
+    const names = parsed.data.map((p) => p.name);
+    if (new Set(names).size !== names.length) {
+      return res.status(400).json({ error: "Printer names must be unique per kiosk" });
+    }
+    const list = parsed.data.map((p) => ({ ...p }));
+    const defaults = list.filter((p) => p.isDefault);
+    if (defaults.length > 1) {
+      return res.status(400).json({ error: "Exactly one default printer" });
+    }
+    if (list.length > 0 && defaults.length === 0) list[0].isDefault = true;
+    setPrinters(req.params.kioskId, list);
+    return res.json({ kioskId: req.params.kioskId, printers: list });
   });
 
   return router;

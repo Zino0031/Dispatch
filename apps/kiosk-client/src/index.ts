@@ -13,6 +13,7 @@ interface PrintJobPayload {
   copies: number;
   color: string;
   duplex: boolean;
+  printer?: string;
 }
 
 /** Client guard mirror of the backend contract (docs/SOCKET_PROTOCOL.md). */
@@ -24,7 +25,8 @@ function isPrintJobPayload(msg: unknown, kioskId: string): msg is PrintJobPayloa
     typeof j.fileUrl === "string" &&
     Number.isInteger(j.copies) &&
     (j.color === "bw" || j.color === "color") &&
-    typeof j.duplex === "boolean"
+    typeof j.duplex === "boolean" &&
+    (j.printer === undefined || typeof j.printer === "string")
   );
 }
 
@@ -73,16 +75,19 @@ async function processJob(job: PrintJobPayload): Promise<void> {
     if (config.dryRun) {
       await wait(400);
     } else if (file) {
-      const cups = await checkCups();
+      const cups = await checkCups(job.printer);
       if (!cups.defaultDestination) {
         throw new Error(
-          "PRINTER_NO_DEFAULT_DESTINATION: no CUPS default printer — run `lpadmin -d <printer>`",
+          job.printer
+            ? `PRINTER_OFFLINE: ${cups.detail}`
+            : "PRINTER_NO_DEFAULT_DESTINATION: no CUPS default printer — run `lpadmin -d <printer>`",
         );
       }
       const requestId = await printFile(file, {
         title: `Print Kiosk ${config.kioskId}`,
         copies: job.copies,
         duplex: job.duplex,
+        ...(job.printer ? { printer: job.printer } : {}),
       });
       log.info("job submitted to CUPS", {
         kioskId: config.kioskId,

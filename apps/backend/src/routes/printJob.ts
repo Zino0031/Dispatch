@@ -13,6 +13,7 @@ import { log } from "../logger.js";
 import { mintFileGrant } from "./files.js";
 import { attachJob, getIntent } from "../payments/pricing.js";
 import { overQuotaBy } from "../users.js";
+import { getPrinters, selectPrinter } from "../kioskRegistry.js";
 import { isKioskOnline } from "../kioskRegistry.js";
 import { dispatchToKiosk } from "../socket.js";
 
@@ -101,6 +102,12 @@ export function createPrintJobRouter(io?: Server): Router {
       }
     }
     const store = getJobs();
+    // Route to a capable printer when the kiosk has printers configured
+    // (issue #19); unconfigured kiosks use the legacy CUPS default.
+    const routed = selectPrinter(kioskId, { color: parsed.data.color, duplex: parsed.data.duplex });
+    if (getPrinters(kioskId).length > 0 && !routed) {
+      return res.status(503).json({ error: "No printer available on this kiosk", kioskId });
+    }
     // Guest-code quota (issue #18): 429 with a clear pre-payment block.
     const userId = req.header("x-user-id")?.trim() || undefined;
     if (userId) {
@@ -109,7 +116,7 @@ export function createPrintJobRouter(io?: Server): Router {
         return res.status(429).json({ error: `Over quota: short ${over} pages for the 30-day window`, userId });
       }
     }
-    const job = await store.create({ ...parsed.data, userId });
+    const job = await store.create({ ...parsed.data, userId, ...(routed ? { printer: routed.name } : {}) });
     if (paymentIntentId) attachJob(paymentIntentId, job.printJobId);
     // FIFO per kiosk (issue #12): hand over immediately when idle,
     // otherwise hold as QUEUED with a position.
@@ -122,6 +129,7 @@ export function createPrintJobRouter(io?: Server): Router {
         copies: job.copies,
         color: job.color,
         duplex: job.duplex,
+        ...(job.printer ? { printer: job.printer } : {}),
       });
       log.info("print-job created", { printJobId: job.printJobId, kioskId: job.kioskId, status: "SENT_TO_KIOSK", position: 0 });
       return res
