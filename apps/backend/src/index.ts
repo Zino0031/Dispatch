@@ -7,6 +7,7 @@ import { enrollKiosk, onlineKiosks, setKioskOnline } from "./kioskRegistry.js";
 import { createAdminRouter } from "./routes/admin.js";
 import { createFilesRouter } from "./routes/files.js";
 import { createPrintJobRouter } from "./routes/printJob.js";
+import { startRetentionSweeper } from "./retention.js";
 import { setupSocket } from "./socket.js";
 
 export function createApp(): { app: express.Express; server: HttpServer; io: Server } {
@@ -50,6 +51,7 @@ if (process.env.TEST_SEED_KIOSK && process.env.NODE_ENV !== "production") {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  startRetentionSweeper();
   const { server } = createApp();
   server.listen(config.PORT, () => {
     // eslint-disable-next-line no-console

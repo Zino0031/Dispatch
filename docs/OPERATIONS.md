@@ -63,7 +63,14 @@ Backend file-logging deployments: rotate with logrotate, e.g.
 `/var/log/print-kiosk/*.log { daily rotate 14 compress missingok }`.
 Never log tokens (`docs/GUIDELINES.md`).
 
+## Upload retention
+
+`PRINT_DOCUMENT_RETENTION_HOURS` (default 24) is enforced by an hourly in-process
+sweeper (`apps/backend/src/retention.ts`, disable with `RETENTION_SWEEPER=off`).
+It deletes `uploads/*` older than the window, never touching files backing active
+jobs (`QUEUED…PRINTING_STARTED`). Dry-run: `npm run sweep -- --dry-run` in
+`apps/backend` (lists without deleting); each real deletion is JSON-logged.
+
 ## Pre-pilot hardening TODO
-~~systemd unit, CUPS/LibreOffice provision script, disk-space guard on `TEMP_DIR`/`uploads/`,
-log rotation~~ (done: issues #5–#7) — remaining: retention sweeper for `uploads/`
-honoring `PRINT_DOCUMENT_RETENTION_HOURS` (issue #11).
+Done via issues #5–#11 (systemd unit, provision script, disk guards, log
+rotation docs, retention sweeper). Remaining pilot work: issues #12–#16.
