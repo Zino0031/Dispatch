@@ -26,3 +26,7 @@ export function kioskStatuses(): KioskStatus[] {
 export function onlineKiosks(): KioskStatus[] {
   return kioskStatuses().filter((k) => k.online);
 }
+
+export function isKioskOnline(kioskId: string): boolean {
+  return online.has(kioskId);
+}

@@ -1,7 +1,8 @@
 import cors from "cors";
 import express from "express";
 import { config, isAllowedCorsOrigin } from "./config.js";
-import { onlineKiosks } from "./kioskRegistry.js";
+import { onlineKiosks, setKioskOnline } from "./kioskRegistry.js";
+import { createPrintJobRouter } from "./routes/printJob.js";
 
 export function createApp(): express.Express {
   const app = express();
@@ -24,7 +25,17 @@ export function createApp(): express.Express {
     res.json({ kiosks: onlineKiosks() });
   });
 
+  app.use("/api", createPrintJobRouter());
+  // Statically served uploads — known gap, token-gated proxy lands in #10.
+  app.use("/uploads", express.static("uploads"));
+
   return app;
+}
+
+// Dev/test seed: mark one kiosk online so dispatch 201 is exercisable before
+// socket enrollment lands (issue #4). Never set in production.
+if (process.env.TEST_SEED_KIOSK && process.env.NODE_ENV !== "production") {
+  setKioskOnline(process.env.TEST_SEED_KIOSK, "Test kiosk");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
