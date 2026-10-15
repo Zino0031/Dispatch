@@ -48,6 +48,7 @@ async function requireDefaultPrinter(): Promise<void> {
       message.includes("No destinations")
         ? "CUPS has no default printer configured"
         : message,
+      { cause: error },
     );
   }
 }
@@ -70,6 +71,6 @@ export async function printWithCups(
     await waitForCompletion(requestId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "CUPS rejected the print job";
-    throw new Error(message);
+    throw new Error(message, { cause: error });
   }
 }

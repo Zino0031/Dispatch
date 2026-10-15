@@ -8,33 +8,6 @@ function required(name: string, fallback?: string): string {
   return value;
 }
 
-function parseKioskCredentials(raw: string): Record<string, string> {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
-      throw new Error("KIOSK_CREDENTIALS must be a JSON object of kioskId → token");
-    }
-
-    const credentials: Record<string, string> = {};
-    for (const [kioskId, token] of Object.entries(parsed)) {
-      if (typeof token !== "string" || token.length === 0) {
-        throw new Error(`Invalid token for kiosk "${kioskId}"`);
-      }
-      credentials[kioskId] = token;
-    }
-    return credentials;
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      throw new Error("KIOSK_CREDENTIALS must be valid JSON");
-    }
-    throw error;
-  }
-}
-
 export const config = {
   port: Number(process.env.PORT ?? 4000),
   publicUrl: process.env.PUBLIC_URL ?? "http://localhost:4000",

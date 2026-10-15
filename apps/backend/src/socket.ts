@@ -1,12 +1,11 @@
 import type { Server as SocketIOServer, Socket } from "socket.io";
-import { config, jobRoom, kioskRoom } from "./config.js";
+import { jobRoom, kioskRoom } from "./config.js";
 import {
   isKioskOnline,
   listOnlineKiosks,
   onlineKioskCount,
   registerKiosk,
   unregisterKiosk,
-  authenticateKiosk,
   authenticateOrEnrollKiosk,
 } from "./kioskRegistry.js";
 import {

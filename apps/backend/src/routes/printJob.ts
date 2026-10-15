@@ -2,7 +2,6 @@ import { Router } from "express";
 import type { Server as SocketIOServer } from "socket.io";
 import multer from "multer";
 import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { emitNewPrintJob, isKioskOnline } from "../socket.js";

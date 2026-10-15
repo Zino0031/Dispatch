@@ -17,8 +17,20 @@ socket.on("connect_error", (error) => {
   console.error("Connection failed:", error.message);
 });
 
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 socket.on("NEW_PRINT_JOB", (payload) => {
   console.log("NEW_PRINT_JOB", JSON.stringify(payload, null, 2));
+  void (async () => {
+    const printJobId = (payload as { printJobId?: unknown }).printJobId;
+    if (typeof printJobId !== "string") return;
+    for (const event of ["DOWNLOAD_START", "DOWNLOAD_COMPLETE", "PRINTING_STARTED"] as const) {
+      socket.emit("kiosk_status", { printJobId, event });
+      await wait(300);
+    }
+    socket.emit("kiosk_status", { printJobId, event: "PRINT_SUCCESS" });
+    console.log(`Completed ${printJobId}`);
+  })();
 });
 
 socket.on("disconnect", (reason) => {

@@ -548,7 +548,7 @@ export default function Home() {
     dragIdx.current = null;
   }
 
-  function useScan() {
+  function acceptScan() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.toBlob((blob) => {
@@ -1068,7 +1068,7 @@ export default function Home() {
                                 ⟳
                               </button>
                             </div>
-                            <button type="button" className="submit" onClick={() => void useScan()}>
+                            <button type="button" className="submit" onClick={() => void acceptScan()}>
                               Use this scan
                             </button>
                             <div className="retake-wrap">

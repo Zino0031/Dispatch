@@ -12,12 +12,9 @@ function required(name: string): string {
 }
 
 const tokenFile = resolve(process.env.KIOSK_TOKEN_FILE ?? ".kiosk-token");
-let storedToken = "";
-try {
-  storedToken = (await readFile(tokenFile, "utf8")).trim();
-} catch {
-  storedToken = "";
-}
+const storedToken = await readFile(tokenFile, "utf8")
+  .then((contents) => contents.trim())
+  .catch(() => "");
 
 export const config = {
   serverUrl: required("SERVER_URL"),

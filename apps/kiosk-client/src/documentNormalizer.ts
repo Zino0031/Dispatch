@@ -21,7 +21,7 @@ export async function normalizeForPrinting(filePath: string): Promise<string> {
     ], { timeout: 60_000 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "LibreOffice conversion failed";
-    throw new Error(`DOCUMENT_CONVERSION_FAILED: install LibreOffice to print DOC/DOCX files (${message})`);
+    throw new Error(`DOCUMENT_CONVERSION_FAILED: install LibreOffice to print DOC/DOCX files (${message})`, { cause: error });
   }
 
   const pdfPath = join(outputDirectory, `${basename(filePath, extension)}.pdf`);

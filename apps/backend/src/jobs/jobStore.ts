@@ -16,8 +16,7 @@ function errorCode(status: PrintJobStatus, message?: string): string | undefined
   return "KIOSK_JOB_ERROR";
 }
 
-export interface CreatePrintJobInput
-  extends Omit<NewPrintJobPayload, "printJobId"> {}
+export type CreatePrintJobInput = Omit<NewPrintJobPayload, "printJobId">;
 
 export class JobStore {
   private readonly jobs = new Map<string, PrintJobRecord>();
