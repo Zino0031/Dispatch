@@ -8,6 +8,7 @@ import { z } from "zod";
 import { MAX_FILE_BYTES } from "../contracts.js";
 import { getJobs } from "../jobs/jobStore.js";
 import { freeBytes } from "../disk.js";
+import { mintFileGrant } from "./files.js";
 import { isKioskOnline } from "../kioskRegistry.js";
 import { emitNewPrintJob } from "../socket.js";
 
@@ -62,7 +63,8 @@ export function createPrintJobRouter(io?: Server): Router {
       fs.renameSync(req.file.path, path.join("uploads", stored));
       const base = process.env.PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
       return res.status(201).json({
-        fileUrl: `${base}/uploads/${stored}`,
+        fileUrl: `${base}/api/files/${stored}`,
+        fileToken: mintFileGrant(stored),
         fileName: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,

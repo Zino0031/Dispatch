@@ -16,12 +16,23 @@ Base URL: `PUBLIC_URL` (dev `http://localhost:4000`). JSON limit `1mb`, except m
 - Accepted mimetypes: `application/pdf, image/jpeg, image/png, application/msword,
   application/vnd.openxmlformats-officedocument.wordprocessingml.document` (`routes/printJob.ts:13-19`)
 - Max 50 MB → multer rejects larger with an error; missing/unsupported → `400 { error }`.
-- Stored as `uploads/<uuid>.<lowercased-ext>`, served at `/uploads/*`.
+- Stored as `uploads/<uuid>.<lowercased-ext>`, served ONLY via the token-gated
+  `GET /api/files/:name` proxy (never statically — issue #10).
+- Upload grants preview BEFORE dispatch: `fileToken` (15 min) as `?token=` or
+  `x-file-token`. After dispatch, the job's `x-print-job-token` or the kiosk's
+  `x-kiosk-id` + `x-kiosk-token` headers authorize. Anything else → 404.
 
 ```bash
 curl -sS -X POST http://localhost:4000/api/upload -F 'file=@sample.pdf'
-# 201 { "fileUrl": "http://localhost:4000/uploads/<uuid>.pdf", "fileName": "...", "mimeType": "...", "size": 12345 }
+# 201 { "fileUrl": "http://localhost:4000/api/files/<uuid>.pdf", "fileToken": "<hex>", "fileName": "...", "mimeType": "...", "size": 12345 }
 ```
+
+## Download a file (token-gated)
+
+`GET /api/files/:name` — filename must match `uploads/<uuid>.<ext>` (else 404).
+Needs one of: `?token=<fileToken>` / `x-file-token`, `x-print-job-token` of a
+job referencing the file, or kiosk credentials (`x-kiosk-id` + `x-kiosk-token`)
+for a kiosk with a job on the file. All failures → `404 { error }` (no oracle).
 
 ## List online kiosks (public)
 
