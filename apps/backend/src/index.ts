@@ -8,6 +8,7 @@ import { createAdminRouter } from "./routes/admin.js";
 import { createFilesRouter } from "./routes/files.js";
 import { createPaymentsRouter } from "./payments/router.js";
 import { createPrintJobRouter } from "./routes/printJob.js";
+import { createUsersRouter } from "./routes/users.js";
 import { log } from "./logger.js";
 import { startRetentionSweeper } from "./retention.js";
 import { setupSocket } from "./socket.js";
@@ -41,6 +42,7 @@ export function createApp(): { app: express.Express; server: HttpServer; io: Ser
   app.use("/api", createAdminRouter());
   app.use("/api", createFilesRouter());
   app.use("/api", createPaymentsRouter());
+  app.use("/api", createUsersRouter());
   // uploads/ is NEVER statically served (issue #10) — all access goes
   // through the token-gated GET /api/files/:name proxy above.
 

@@ -10,10 +10,13 @@ create table if not exists jobs (
   color text not null check (color in ('bw', 'color')),
   duplex boolean not null default false,
   payment_intent_id text,
+  user_id text,
+  pages_estimate int,
   status text not null,
   history jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 create index if not exists jobs_kiosk_id_idx on jobs (kiosk_id);
+create index if not exists jobs_user_id_idx on jobs (user_id);
 create index if not exists jobs_created_at_idx on jobs (created_at desc);

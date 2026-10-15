@@ -12,6 +12,8 @@ interface JobRow {
   color: "bw" | "color";
   duplex: boolean;
   payment_intent_id: string | null;
+  user_id: string | null;
+  pages_estimate: number | null;
   status: PrintJobStatus;
   history: PrintJobRecord["history"];
   created_at: string;
@@ -32,6 +34,8 @@ function toRecord(row: JobRow): PrintJobRecord {
     color: row.color,
     duplex: row.duplex,
     paymentIntentId: row.payment_intent_id ?? undefined,
+    userId: row.user_id ?? undefined,
+    pagesEstimate: row.pages_estimate ?? undefined,
     status: row.status,
     history: row.history,
     createdAt: row.created_at,
@@ -54,6 +58,8 @@ export class SupabaseJobs implements JobRepository {
       color: record.color,
       duplex: record.duplex,
       payment_intent_id: record.paymentIntentId ?? null,
+      user_id: record.userId ?? null,
+      pages_estimate: record.pagesEstimate ?? null,
       status: record.status,
       history: record.history,
     });

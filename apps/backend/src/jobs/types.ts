@@ -14,6 +14,8 @@ export interface JobInput {
   color: "bw" | "color";
   duplex: boolean;
   paymentIntentId?: string;
+  userId?: string;
+  pagesEstimate?: number;
 }
 
 export interface PrintJobRecord extends JobInput {
