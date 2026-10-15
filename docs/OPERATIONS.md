@@ -29,7 +29,9 @@ backend `CORS_ORIGIN` or on the same LAN, otherwise `/api/kiosks` fetch and user
 | `TEMP_DIR` / `MAX_DOWNLOAD_BYTES` / `DOWNLOAD_TIMEOUT_MS` | no | Defaults `./temp` / 50 MB / 60 s |
 
 ## Provisioning a Mini PC kiosk
-1. Install Node 22+, CUPS (`lp, lpstat, cancel`), LibreOffice (for DOC/DOCX), set a CUPS default destination and print a test page.
+1. Provision the OS: `sudo bash apps/kiosk-client/scripts/provision.sh [default-printer]`
+   (Node 22+, CUPS + LibreOffice Writer, `lpadmin -d <printer>` default; fails loudly
+   with no default destination). Then set a CUPS default if skipped and print a test page.
 2. `npm install && cp .env.example .env`, set `SERVER_URL`.
 3. Get the ID: `npm run identity` (or let MAC fallback apply).
 4. Enroll (pick one): (a) admin API `POST /api/admin/kiosks/enroll` → put `token` in `.env` as `KIOSK_TOKEN`;
