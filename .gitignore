@@ -6,6 +6,7 @@ package-lock.json
 dist/
 .next/
 out/
+apps/web/next-env.d.ts
 
 # env + credentials (never commit)
 .env
