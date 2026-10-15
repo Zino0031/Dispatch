@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { getJobs } from "../jobs/jobStore.js";
 import { log } from "../logger.js";
+import { computeMetrics } from "../metrics.js";
 import { hashKioskToken, newKioskToken } from "../kioskAuth.js";
 import {
   enrollKiosk,
@@ -60,9 +61,11 @@ export function createAdminRouter(): Router {
     return res.status(201).json({ kioskId, displayName, token });
   });
 
-  router.get("/admin/overview", async (_req, res) => {
+  router.get("/admin/overview", async (req, res) => {
     const kiosks = kioskStatuses();
-    const jobs = (await getJobs().list()).map((j) => {
+    const all = await getJobs().list();
+    const days = windowDays(req);
+    const jobs = all.map((j) => {
       const { accessToken: _t, fileUrl: _f, ...safe } = j;
       void _t;
       void _f;
@@ -73,13 +76,33 @@ export function createAdminRouter(): Router {
     ).length;
     return res.json({
       kiosks,
-      jobs,
+      jobs: jobs.slice(0, 100),
+      metrics: computeMetrics(all, new Set(kiosks.filter((k) => k.online).map((k) => k.kioskId)), days),
       summary: {
         kiosksOnline: kiosks.filter((k) => k.online).length,
         jobsTotal: jobs.length,
         jobsActive: active,
       },
     });
+  });
+
+  // CSV export for staff (no secrets — same stripped shape as overview).
+  router.get("/admin/metrics.csv", async (req, res) => {
+    const days = windowDays(req);
+    const all = await getJobs().list();
+    const cutoff = days === null ? 0 : Date.now() - days * 86_400_000;
+    const rows = all.filter((j) => Date.parse(j.createdAt) >= cutoff);
+    const esc = (v: string | number | boolean): string => `"${String(v).replace(/"/g, '""')}"`;
+    const lines = [
+      "printJobId,kioskId,copies,color,duplex,status,createdAt,updatedAt",
+      ...rows.map((j) =>
+        [j.printJobId, j.kioskId, j.copies, j.color, j.duplex, j.status, j.createdAt, j.updatedAt]
+          .map(esc)
+          .join(","),
+      ),
+    ];
+    res.header("Content-Type", "text/csv");
+    res.send(lines.join("\n"));
   });
 
   router.patch("/admin/kiosks/:kioskId", (req, res) => {
@@ -124,4 +147,11 @@ export function createAdminRouter(): Router {
   });
 
   return router;
+}
+
+function windowDays(req: { query: unknown }): number | null {
+  const parsed = z
+    .object({ days: z.coerce.number().int().min(1).max(365).optional() })
+    .safeParse(req.query);
+  return parsed.success ? (parsed.data.days ?? null) : null;
 }
