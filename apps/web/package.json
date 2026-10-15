@@ -1,0 +1,12 @@
+{
+  "name": "kiosk-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Next.js user + admin UI (Phase 2, see docs/PRD.md §4)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  }
+}
