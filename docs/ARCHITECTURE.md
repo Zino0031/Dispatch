@@ -86,7 +86,7 @@ Each transition appends `{ status, message?, errorCode?, at }` to `record.histor
 |---|---|
 | Kiosk offline at dispatch | `503 Kiosk offline`, no job created |
 | Kiosk disconnects mid-job | No timeout/retry; web shows "Live connection lost" on socket drop; job stuck at last status |
-| Busy kiosk gets 2nd job | Immediate `ERROR "Kiosk is already processing another job"` for the 2nd job |
+| Busy kiosk gets 2nd job | Held as `QUEUED` with `position` (FIFO, issue #12); kiosk keeps a single-job guard as a safety net (was: immediate busy-`ERROR`) |
 | CUPS no default printer | `PRINTER_NO_DEFAULT_DESTINATION` → `PRINTER_ERROR` |
 | Download too large / non-HTTP(S) / bad status | `DOCUMENT_DOWNLOAD_FAILED` → `ERROR` |
 | LibreOffice missing (DOC/DOCX) | `DOCUMENT_CONVERSION_FAILED` → `ERROR` |

@@ -7,10 +7,11 @@ import { backendUrl } from "./backend";
 interface JobEvent {
   event: string;
   message?: string;
+  position?: number;
   at: string;
 }
 
-const TERMINAL = new Set(["PRINT_SUCCESS", "ERROR", "PRINTER_ERROR"]);
+const TERMINAL = new Set(["PRINT_SUCCESS", "ERROR", "PRINTER_ERROR", "CANCELLED"]);
 
 function labelFor(event: string): string {
   switch (event) {
@@ -29,6 +30,8 @@ function labelFor(event: string): string {
     case "ERROR":
     case "PRINTER_ERROR":
       return "Something went wrong";
+    case "CANCELLED":
+      return "Cancelled";
     default:
       return event;
   }
@@ -53,6 +56,7 @@ export default function LiveTracking({
   const [live, setLive] = useState(true);
   const [lost, setLost] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
   const connect = useCallback(() => {
@@ -112,15 +116,38 @@ export default function LiveTracking({
     }
   };
 
-  const last = events[events.length - 1]?.event;
-  const failed = last === "ERROR" || last === "PRINTER_ERROR";
-  const done = last === "PRINT_SUCCESS";
+  const last = events[events.length - 1];
+  const failed = last?.event === "ERROR" || last?.event === "PRINTER_ERROR";
+  const done = last?.event === "PRINT_SUCCESS";
+  const cancelled = last?.event === "CANCELLED";
+  const queued = last?.event === "QUEUED" && !cancelled;
+  const position = typeof last?.position === "number" ? last.position : null;
+
+  const cancel = async () => {
+    if (!jobToken || cancelling) return;
+    setCancelling(true);
+    const res = await fetch(`${backendUrl()}/api/print-job/${printJobId}`, {
+      method: "DELETE",
+      headers: { "x-print-job-token": jobToken },
+    });
+    setCancelling(false);
+    if (res.ok) {
+      socketRef.current?.disconnect();
+      setLive(false);
+      await checkStatus();
+    }
+  };
 
   return (
     <section aria-live="polite" style={{ border: "1px solid #ccc", borderRadius: 8, padding: 16, marginTop: 12 }}>
       <h2 style={{ fontSize: 18, margin: "0 0 8px" }}>
-        {done ? "Printed ✓" : failed ? "Print failed" : "Printing…"}
+        {done ? "Printed ✓" : failed ? "Print failed" : cancelled ? "Cancelled" : "Printing…"}
       </h2>
+      {queued && position !== null && position > 0 && (
+        <p style={{ margin: "0 0 8px" }}>
+          Position in queue: #{position + 1} ({position} ahead of you)
+        </p>
+      )}
       {lost && !done && (
         <div style={{ border: "1px solid #d33", borderRadius: 8, padding: 12, marginBottom: 12 }}>
           <p style={{ margin: "0 0 8px" }}>Live connection lost… tap Reconnect to retry.</p>
@@ -147,7 +174,13 @@ export default function LiveTracking({
           Send again
         </button>
       )}
+      {queued && (
+        <button onClick={cancel} disabled={cancelling || !jobToken} style={{ marginTop: 12, padding: "8px 16px" }}>
+          {cancelling ? "Cancelling…" : "Cancel this job"}
+        </button>
+      )}
       {done && <p style={{ marginBottom: 0 }}>Job {printJobId.slice(0, 8)} complete.</p>}
+      {cancelled && <p style={{ marginBottom: 0 }}>Job cancelled — nothing was printed.</p>}
       {!live && !done && !failed && !lost && <p>Connection closed.</p>}
     </section>
   );
