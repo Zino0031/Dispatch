@@ -63,8 +63,14 @@ export default function LiveTracking({
     socketRef.current?.disconnect();
     setLost(false);
     setLive(true);
+    if (!jobToken) {
+      // Shouldn't happen (token comes from the 201 response) — never hang.
+      setLost(true);
+      setLive(false);
+      return;
+    }
     const socket = io(backendUrl(), {
-      auth: { role: "user", printJobId },
+      auth: { role: "user", printJobId, token: jobToken },
       transports: ["websocket"],
     });
     socketRef.current = socket;
@@ -90,7 +96,7 @@ export default function LiveTracking({
       setLost(true);
       setLive(false);
     });
-  }, [printJobId]);
+  }, [printJobId, jobToken]);
 
   useEffect(() => {
     connect();

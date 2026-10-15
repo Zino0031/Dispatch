@@ -76,8 +76,8 @@ Each transition appends `{ status, message?, errorCode?, at }` to `record.histor
   `verifyKioskToken` uses `timingSafeEqual`. Three issuance paths: admin enroll API, auto-enroll on
   first connect, manual token via env/`tokenFile`.
 - **Admin:** single shared `ADMIN_TOKEN` header (`x-admin-token`). No RBAC in v1.
-- **User/job:** unguessable `accessToken` required as `x-print-job-token` for `GET /print-job/:id`.
-  The live `JOB_STATUS` channel requires only the `printJobId` (by design for a demo; tighten before production).
+- **User/job:** unguessable `accessToken` required as `x-print-job-token` for `GET /print-job/:id`
+  and as `token` in user-socket auth (verified hashed; wrong/missing → `404` / `connect_error`).
 - **Uploads:** unauthenticated static serving. Known gap — see PRD §8.3.
 
 ## 6. Failure modes

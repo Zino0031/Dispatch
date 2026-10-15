@@ -22,6 +22,7 @@ interface KioskAuth {
 interface UserAuth {
   role?: string;
   printJobId?: string;
+  token?: string;
 }
 
 // Latest socket per kiosk wins; older socket force-disconnected.
@@ -91,7 +92,10 @@ export function setupSocket(io: Server): void {
     const auth = socket.handshake.auth as KioskAuth & UserAuth;
     if (auth.role === "user") {
       if (!auth.printJobId) return next(new Error("Missing printJobId"));
-      // No token check in v1 (known gap — issue #13).
+      // v1 gap closed (issue #13): job accessToken required, verified hashed.
+      if (!auth.token) return next(new Error("Missing job access token"));
+      const job = await getJobs().verifyAccess(auth.printJobId, auth.token);
+      if (!job) return next(new Error("Invalid job access token"));
       return next();
     }
     // Kiosk role (default).
