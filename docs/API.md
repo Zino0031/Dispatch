@@ -108,7 +108,7 @@ All require header `x-admin-token: <ADMIN_TOKEN>`, else `401 { error: "Admin aut
 | Method | Path | Body | Success |
 |---|---|---|---|
 | POST | `/api/admin/kiosks/enroll` | `{ kioskId, displayName, enrollmentToken }` | `201 { kioskId, displayName, token }` (one-time kiosk token). `401` on bad enrollment token or Supabase unconfigured |
-| GET | `/api/admin/overview` | — | `{ kiosks: [{ kioskId, displayName, online, printers, connectedAt? }], jobs: [...last 100, no accessToken/fileUrl], metrics: { successRate, errorBreakdown, medianUploadToSuccessMs, perKiosk }, summary }` (`?days=N` windows metrics+jobs... jobs stay last-100; metrics honor the window) |
+| GET | `/api/admin/overview` | — | `{ kiosks, jobs (last 100, stripped), metrics (honors ?days=N), summary }` |
 | GET | `/api/admin/metrics.csv` | — | CSV export (no secrets), same `?days=N` window |
 | PATCH | `/api/admin/kiosks/:kioskId` | `{ displayName: "1–80 chars" }` | `{ kioskId, displayName }`. `503` when Supabase unconfigured, `404` when kiosk unknown |
 | GET | `/api/admin/kiosks/:kioskId/printers` | — | `{ kioskId, printers: [{ name, color, duplex, isDefault }] }` (`404` unknown) |
