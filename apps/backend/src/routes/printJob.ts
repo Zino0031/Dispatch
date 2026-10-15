@@ -5,12 +5,13 @@ import { Router } from "express";
 import multer from "multer";
 import type { Server } from "socket.io";
 import { z } from "zod";
-import { MAX_FILE_BYTES } from "../contracts.js";
+import { MAX_FILE_BYTES, SOCKET_EVENTS, jobRoom } from "../contracts.js";
 import { getJobs } from "../jobs/jobStore.js";
+import { dequeue, enqueue, isIdle, positionOf } from "../jobs/queue.js";
 import { freeBytes } from "../disk.js";
 import { mintFileGrant } from "./files.js";
 import { isKioskOnline } from "../kioskRegistry.js";
-import { emitNewPrintJob } from "../socket.js";
+import { dispatchToKiosk } from "../socket.js";
 
 // Must stay in sync with web validateFile() (docs/PRD.md §5.1).
 const allowedMimeTypes = new Set([
@@ -85,8 +86,11 @@ export function createPrintJobRouter(io?: Server): Router {
     }
     const store = getJobs();
     const job = await store.create(parsed.data);
-    if (io) {
-      await emitNewPrintJob(io, {
+    // FIFO per kiosk (issue #12): hand over immediately when idle,
+    // otherwise hold as QUEUED with a position.
+    const ahead = enqueue(job.kioskId, job.printJobId);
+    if (io && isIdle(job.kioskId)) {
+      await dispatchToKiosk(io, {
         printJobId: job.printJobId,
         kioskId: job.kioskId,
         fileUrl: job.fileUrl,
@@ -94,15 +98,27 @@ export function createPrintJobRouter(io?: Server): Router {
         color: job.color,
         duplex: job.duplex,
       });
-      const current = await store.get(job.printJobId);
       return res
         .status(201)
-        .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: current?.status ?? job.status });
+        .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: "SENT_TO_KIOSK", position: 0 });
     }
-    await store.updateStatus(job.printJobId, "SENT_TO_KIOSK");
+    if (io) {
+      io.to(jobRoom(job.printJobId)).emit(SOCKET_EVENTS.JOB_STATUS, {
+        printJobId: job.printJobId,
+        kioskId: job.kioskId,
+        event: "QUEUED",
+        position: ahead,
+        at: job.updatedAt,
+      });
+    } else {
+      await store.updateStatus(job.printJobId, "SENT_TO_KIOSK");
+      return res
+        .status(201)
+        .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: "SENT_TO_KIOSK", position: 0 });
+    }
     return res
       .status(201)
-      .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: "SENT_TO_KIOSK" });
+      .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: "QUEUED", position: ahead });
   });
 
   // Token-gated read: wrong/missing token or unknown id → 404 (no id oracle).
@@ -115,7 +131,22 @@ export function createPrintJobRouter(io?: Server): Router {
     const { accessToken: _t, fileUrl: _f, ...safe } = job;
     void _t;
     void _f;
-    return res.json(safe);
+    return res.json({ ...safe, position: positionOf(job.kioskId, job.printJobId) });
+  });
+
+  // Cancel a QUEUED (not yet sent) job. Active/sent jobs → 409.
+  router.delete("/print-job/:printJobId", async (req, res) => {
+    const token = req.header("x-print-job-token") ?? "";
+    const store = getJobs();
+    const job = await store.verifyAccess(req.params.printJobId, token);
+    if (!job) {
+      return res.status(404).json({ error: "Print job not found" });
+    }
+    if (job.status !== "QUEUED" || !dequeue(job.kioskId, job.printJobId)) {
+      return res.status(409).json({ error: "Only queued jobs can be cancelled" });
+    }
+    const updated = await store.updateStatus(job.printJobId, "CANCELLED", "Cancelled by user");
+    return res.json({ printJobId: job.printJobId, status: updated?.status ?? "CANCELLED" });
   });
 
   return router;

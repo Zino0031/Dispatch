@@ -50,6 +50,11 @@ Offline kiosks are filtered out here (admin overview shows all — see below).
 
 Constraints: `kioskId` non-empty; `fileUrl` valid URL; `copies` int 1–50; `color` `bw|color`; `duplex` bool.
 
+Per-kiosk FIFO queue (issue #12): the first job for an idle kiosk dispatches
+immediately (`SENT_TO_KIOSK, position 0`); further jobs hold as `QUEUED` with
+`position` = jobs ahead (0 = with the kiosk). Terminal kiosk status hands the
+next queued job over automatically. `JOB_STATUS` events carry `position`.
+
 ```bash
 curl -sS -X POST http://localhost:4000/api/print-job -H 'Content-Type: application/json' \
   -d '{"kioskId":"kiosk-lab-1","fileUrl":"https://example.com/sample.pdf","copies":1,"color":"bw","duplex":false}'
@@ -57,6 +62,12 @@ curl -sS -X POST http://localhost:4000/api/print-job -H 'Content-Type: applicati
 # offline: 503 { "error": "Kiosk offline", "kioskId": "kiosk-lab-1" }
 # invalid: 400 { "error": "Invalid print job payload", "details": { ...zod flatten... } }
 ```
+
+## Cancel a queued print job
+
+`DELETE /api/print-job/:printJobId` — header `x-print-job-token: <accessToken>`.
+Only `QUEUED` (not yet sent) jobs cancel → `200 { printJobId, status: "CANCELLED" }`.
+Anything else → `409 { error }`; wrong/missing token or unknown id → `404`.
 
 ## Read a print job (token-gated)
 
