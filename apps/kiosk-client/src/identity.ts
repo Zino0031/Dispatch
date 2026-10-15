@@ -13,6 +13,5 @@ export function getHardwareId(): string {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  // eslint-disable-next-line no-console
   console.log(getHardwareId());
 }

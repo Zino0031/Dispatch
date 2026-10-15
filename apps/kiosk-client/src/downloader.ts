@@ -41,6 +41,7 @@ export async function downloadFile(fileUrl: string): Promise<string> {
   } catch (e) {
     throw new Error(
       `DOCUMENT_DOWNLOAD_FAILED: ${e instanceof Error ? e.message : "fetch failed"}`,
+      { cause: e },
     );
   } finally {
     clearTimeout(timeout);

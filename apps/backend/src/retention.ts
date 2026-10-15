@@ -44,7 +44,7 @@ export async function sweepUploads(dryRun: boolean): Promise<SweepResult> {
       result.skippedActive.push(e.name);
       continue;
     }
-    let mtime = 0;
+    let mtime: number;
     try {
       mtime = fs.statSync(full).mtimeMs;
     } catch {
