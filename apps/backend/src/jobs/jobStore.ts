@@ -58,3 +58,10 @@ export function createJob(input: {
 export function getJob(printJobId: string): PrintJobRecord | undefined {
   return jobs.get(printJobId);
 }
+
+/** Last 100 jobs, newest first (admin overview shape; tokens/fileUrls stripped by caller). */
+export function listJobs(): PrintJobRecord[] {
+  return [...jobs.values()]
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 100);
+}
