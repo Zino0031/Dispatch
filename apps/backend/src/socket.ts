@@ -10,6 +10,7 @@ import { enrollKiosk, getKioskSettings, setKioskOffline, setKioskOnline } from "
 import { hashKioskToken, newKioskToken, verifyKioskToken } from "./kioskAuth.js";
 import { getJobs } from "./jobs/jobStore.js";
 import { completeActive, markSent, positionOf, waiting } from "./jobs/queue.js";
+import { log } from "./logger.js";
 
 const AUTO_ENROLL = process.env.AUTO_ENROLL_KIOSKS === "true";
 
@@ -142,6 +143,7 @@ export function setupSocket(io: Server): void {
     const kioskId = (auth as KioskAuth).kioskId as string;
     void socket.join(kioskRoom(kioskId));
     registerKiosk(kioskId, socket);
+    log.info("kiosk connected", { kioskId });
 
     socket.on(SOCKET_EVENTS.KIOSK_STATUS, (msg: unknown) => {
       const body = msg as { printJobId?: unknown; event?: unknown; message?: unknown };
@@ -157,6 +159,7 @@ export function setupSocket(io: Server): void {
       void store.get(body.printJobId).then((job) => {
         if (!job || job.kioskId !== kioskId) return; // unknown job or wrong kiosk — drop.
         const message = typeof body.message === "string" ? body.message : undefined;
+        log.info("kiosk status", { kioskId, printJobId: job.printJobId, event });
         void store.updateStatus(job.printJobId, event as PrintJobStatus, message).then((updated) => {
           if (!updated) return;
           io.to(jobRoom(job.printJobId)).emit(SOCKET_EVENTS.JOB_STATUS, {
@@ -182,6 +185,9 @@ export function setupSocket(io: Server): void {
       });
     });
 
-    socket.on("disconnect", () => unregisterKiosk(kioskId, socket));
+    socket.on("disconnect", () => {
+      unregisterKiosk(kioskId, socket);
+      log.info("kiosk disconnected", { kioskId });
+    });
   });
 }

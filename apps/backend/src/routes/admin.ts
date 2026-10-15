@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { getJobs } from "../jobs/jobStore.js";
+import { log } from "../logger.js";
 import { hashKioskToken, newKioskToken } from "../kioskAuth.js";
 import {
   enrollKiosk,
@@ -46,6 +47,7 @@ export function createAdminRouter(): Router {
     // One-time kiosk token; only its scrypt hash is stored (docs/ARCHITECTURE.md §5).
     const token = newKioskToken();
     enrollKiosk(kioskId, displayName, await hashKioskToken(token));
+    log.info("kiosk enrolled", { kioskId });
     return res.status(201).json({ kioskId, displayName, token });
   });
 

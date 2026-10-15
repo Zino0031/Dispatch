@@ -9,6 +9,7 @@ import { MAX_FILE_BYTES, SOCKET_EVENTS, jobRoom } from "../contracts.js";
 import { getJobs } from "../jobs/jobStore.js";
 import { dequeue, enqueue, isIdle, positionOf } from "../jobs/queue.js";
 import { freeBytes } from "../disk.js";
+import { log } from "../logger.js";
 import { mintFileGrant } from "./files.js";
 import { isKioskOnline } from "../kioskRegistry.js";
 import { dispatchToKiosk } from "../socket.js";
@@ -82,6 +83,7 @@ export function createPrintJobRouter(io?: Server): Router {
     }
     const { kioskId } = parsed.data;
     if (!isKioskOnline(kioskId)) {
+      log.warn("dispatch rejected: kiosk offline", { kioskId });
       return res.status(503).json({ error: "Kiosk offline", kioskId });
     }
     const store = getJobs();
@@ -98,6 +100,7 @@ export function createPrintJobRouter(io?: Server): Router {
         color: job.color,
         duplex: job.duplex,
       });
+      log.info("print-job created", { printJobId: job.printJobId, kioskId: job.kioskId, status: "SENT_TO_KIOSK", position: 0 });
       return res
         .status(201)
         .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: "SENT_TO_KIOSK", position: 0 });
@@ -116,6 +119,7 @@ export function createPrintJobRouter(io?: Server): Router {
         .status(201)
         .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: "SENT_TO_KIOSK", position: 0 });
     }
+    log.info("print-job created", { printJobId: job.printJobId, kioskId: job.kioskId, status: "QUEUED", position: ahead });
     return res
       .status(201)
       .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: "QUEUED", position: ahead });
