@@ -1,0 +1,12 @@
+name: contracts
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Triple-contract sync check
+        run: bash scripts/check-contracts.sh
