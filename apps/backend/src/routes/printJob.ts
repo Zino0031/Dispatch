@@ -3,10 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { Router } from "express";
 import multer from "multer";
+import type { Server } from "socket.io";
 import { z } from "zod";
 import { MAX_FILE_BYTES } from "../contracts.js";
-import { createJob, getJob } from "../jobs/jobStore.js";
+import { createJob, getJob, updateStatus } from "../jobs/jobStore.js";
 import { isKioskOnline } from "../kioskRegistry.js";
+import { emitNewPrintJob } from "../socket.js";
 
 // Must stay in sync with web validateFile() (docs/PRD.md §5.1).
 const allowedMimeTypes = new Set([
@@ -34,7 +36,7 @@ const printJobSchema = z.object({
   duplex: z.boolean(),
 });
 
-export function createPrintJobRouter(): Router {
+export function createPrintJobRouter(io?: Server): Router {
   const router = Router();
 
   router.post("/upload", (req, res) => {
@@ -75,6 +77,18 @@ export function createPrintJobRouter(): Router {
       return res.status(503).json({ error: "Kiosk offline", kioskId });
     }
     const job = createJob(parsed.data);
+    if (io) {
+      emitNewPrintJob(io, {
+        printJobId: job.printJobId,
+        kioskId: job.kioskId,
+        fileUrl: job.fileUrl,
+        copies: job.copies,
+        color: job.color,
+        duplex: job.duplex,
+      });
+    } else {
+      updateStatus(job.printJobId, "SENT_TO_KIOSK");
+    }
     return res
       .status(201)
       .json({ printJobId: job.printJobId, accessToken: job.accessToken, status: job.status });

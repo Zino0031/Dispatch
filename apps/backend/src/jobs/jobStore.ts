@@ -47,16 +47,25 @@ export function createJob(input: {
     createdAt: now,
     updatedAt: now,
   };
-  // Realtime NEW_PRINT_JOB emit lands in issue #4; record SENT_TO_KIOSK now.
-  record.status = "SENT_TO_KIOSK";
-  record.history.push(entry("SENT_TO_KIOSK"));
-  record.updatedAt = new Date().toISOString();
   jobs.set(record.printJobId, record);
   return record;
 }
 
 export function getJob(printJobId: string): PrintJobRecord | undefined {
   return jobs.get(printJobId);
+}
+
+export function updateStatus(
+  printJobId: string,
+  status: PrintJobStatus,
+  message?: string,
+): PrintJobRecord | undefined {
+  const job = jobs.get(printJobId);
+  if (!job) return undefined;
+  job.status = status;
+  job.history.push({ status, message, at: new Date().toISOString() });
+  job.updatedAt = new Date().toISOString();
+  return job;
 }
 
 /** Last 100 jobs, newest first (admin overview shape; tokens/fileUrls stripped by caller). */

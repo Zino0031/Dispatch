@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { backendUrl } from "./backend";
+import LiveTracking from "./tracking";
 import { validateFile } from "../lib/validateFile";
 
 interface Kiosk {
@@ -21,10 +22,10 @@ interface UploadedFile {
 type Step = "kiosk" | "upload" | "sent";
 
 /**
- * Wizard steps 1–2 (issues #1–#2).
+ * Wizard steps 1–2 + live tracking (issues #1, #2, #4).
  * Kiosk picker with empty-state + upload with client/server validation,
- * retry preserving the file, and 503 offline dispatch messaging.
- * Review/payment/tracking land in issues #3–#4.
+ * retry preserving the file, 503 offline dispatch messaging, and a
+ * user-role socket timeline (tracking.tsx). Review/payment land later.
  */
 export default function Home() {
   const [step, setStep] = useState<Step>("kiosk");
@@ -41,6 +42,7 @@ export default function Home() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [kioskWentOffline, setKioskWentOffline] = useState(false);
   const [printJobId, setPrintJobId] = useState<string | null>(null);
+  const [jobToken, setJobToken] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setKiosksLoading(true);
@@ -127,7 +129,7 @@ export default function Home() {
           duplex: false,
         }),
       });
-      const data = (await res.json()) as { printJobId?: string; error?: string };
+      const data = (await res.json()) as { printJobId?: string; accessToken?: string; error?: string };
       if (res.status === 503) {
         // Kiosk went offline between selection and dispatch — never hang.
         setKioskWentOffline(true);
@@ -137,6 +139,7 @@ export default function Home() {
       }
       if (!res.ok) throw new Error(data.error ?? `dispatch failed (${res.status})`);
       setPrintJobId(data.printJobId ?? null);
+      setJobToken(data.accessToken ?? null);
       setStep("sent");
     } catch (e) {
       setSendError(e instanceof Error ? e.message : "Couldn't send to printer. Try again.");
@@ -264,11 +267,8 @@ export default function Home() {
         </>
       )}
 
-      {step === "sent" && (
-        <section aria-live="polite" style={{ border: "1px solid #2a2", borderRadius: 8, padding: 16, marginTop: 12 }}>
-          <h2 style={{ fontSize: 18, margin: "0 0 8px" }}>Sent to printer</h2>
-          <p style={{ margin: 0 }}>Job {printJobId} is on its way. Live tracking arrives in the next issue.</p>
-        </section>
+      {step === "sent" && printJobId && (
+        <LiveTracking printJobId={printJobId} jobToken={jobToken} onRetry={() => { setStep("upload"); }} />
       )}
     </main>
   );
