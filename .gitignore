@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+.next/
+out/
+*.tsbuildinfo
+apps/web/next-env.d.ts
+
+# env + credentials (never commit)
+.env
+.env.local
+.kiosk-token
+
+# runtime data (never commit content, keep dirs via .gitkeep)
+apps/backend/uploads/*
+!apps/backend/uploads/.gitkeep
+apps/kiosk-client/temp/*
+!apps/kiosk-client/temp/.gitkeep
+pilot-data/*
+
+# logs + OS
+*.log
+.DS_Store
