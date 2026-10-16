@@ -1,0 +1,38 @@
+# Render blueprint for the print-kiosk backend (Socket.io needs a persistent
+# process, so the backend lives here — not on Vercel serverless).
+# Deploy: connect the Dispatch repo in Render → New → Blueprint → select this file.
+services:
+  - type: web
+    name: print-kiosk-backend
+    runtime: node
+    rootDir: apps/backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      # Render injects PORT automatically; do not set it here.
+      - key: PUBLIC_URL
+        value: https://print-kiosk-backend.onrender.com
+      - key: CORS_ORIGIN
+        value: https://your-web-app.vercel.app
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: KIOSK_ENROLLMENT_TOKEN
+        generateValue: true
+      - key: AUTO_ENROLL_KIOSKS
+        value: "false"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: print-documents
+      - key: PRINT_DOCUMENT_RETENTION_HOURS
+        value: "24"
+    # Uploads live on ephemeral disk by default (files vanish on restart/
+    # redeploy — fine for pilot). For durable uploads, attach a paid
+    # persistent disk mounted at the service's uploads/ directory instead.
+    # disk:
+    #   name: uploads
+    #   mountPath: /opt/render/project/src/uploads
+    #   sizeGB: 5
