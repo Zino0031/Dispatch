@@ -680,7 +680,7 @@ export default function Home() {
           </button>
         ) : (
           <span className="mark" aria-hidden>
-            <span>PK</span>
+            <span>DN</span>
           </span>
         )}
         <strong className="app-title">Dispatch Network</strong>
