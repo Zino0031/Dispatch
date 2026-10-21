@@ -12,9 +12,9 @@ services:
     envVars:
       # Render injects PORT automatically; do not set it here.
       - key: PUBLIC_URL
-        value: https://print-kiosk-backend.onrender.com
+        value: https://print-kiosk-backend-10xs.onrender.com
       - key: CORS_ORIGIN
-        value: https://your-web-app.vercel.app
+        value: https://print-kiosk-web-my-team29.vercel.app
       - key: ADMIN_TOKEN
         generateValue: true
       - key: KIOSK_ENROLLMENT_TOKEN

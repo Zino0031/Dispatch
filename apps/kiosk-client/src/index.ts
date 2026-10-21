@@ -35,7 +35,8 @@ function isPrintJobPayload(value: unknown): value is NewPrintJobPayload {
     typeof job.fileUrl === "string" &&
     Number.isInteger(job.copies) &&
     (job.color === "bw" || job.color === "color") &&
-    typeof job.duplex === "boolean"
+    typeof job.duplex === "boolean" &&
+    (job.pages === undefined || typeof job.pages === "string")
   );
 }
 

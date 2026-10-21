@@ -44,6 +44,17 @@ const printJobBodySchema = z.object({
   copies: z.number().int().min(1).max(50),
   color: z.enum(["bw", "color"]),
   duplex: z.boolean(),
+  pages: z
+    .string()
+    .optional()
+    .refine(
+      (v) => {
+        if (!v?.trim()) return true;
+        // Comma-separated list of single pages or "a-b" ranges, e.g. "1-3, 5".
+        return /^\s*\d+(?:\s*-\s*\d+)?\s*(?:,\s*\d+(?:\s*-\s*\d+)?\s*)*$/.test(v ?? "");
+      },
+      { message: "Use page ranges like 1-3, 5" }
+    ),
 });
 
 export function createPrintJobRouter(io: SocketIOServer): Router {
@@ -79,7 +90,7 @@ export function createPrintJobRouter(io: SocketIOServer): Router {
       return;
     }
 
-    const { kioskId, fileUrl, copies, color, duplex } = parsed.data;
+    const { kioskId, fileUrl, copies, color, duplex, pages } = parsed.data;
     if (!isKioskOnline(kioskId)) {
       res.status(503).json({ error: "Kiosk offline", kioskId });
       return;
@@ -91,6 +102,7 @@ export function createPrintJobRouter(io: SocketIOServer): Router {
       copies,
       color,
       duplex,
+      ...(pages ? { pages } : {}),
     });
 
     emitNewPrintJob(io, job);

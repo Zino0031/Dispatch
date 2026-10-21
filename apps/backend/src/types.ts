@@ -24,6 +24,7 @@ export interface NewPrintJobPayload {
   copies: number;
   color: PrintColor;
   duplex: boolean;
+  pages?: string;
 }
 
 export interface KioskStatusPayload {
@@ -39,6 +40,7 @@ export interface PrintJobRecord {
   copies: number;
   color: PrintColor;
   duplex: boolean;
+  pages?: string;
   status: PrintJobStatus;
   accessToken: string;
   createdAt: string;
