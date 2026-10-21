@@ -83,7 +83,7 @@ export async function authenticateOrEnrollKiosk(
   const authTokenHash = hashKioskToken(issuedToken);
   const { error } = await supabase.from("kiosks").upsert({
     kiosk_id: kioskId,
-    display_name: existing?.display_name ?? kioskId,
+    display_name: existing?.display_name ?? "Dispatch Network",
     auth_token_hash: authTokenHash,
     revoked_at: null,
     last_seen_at: new Date().toISOString(),
@@ -130,7 +130,7 @@ export function registerKiosk(
 
   kiosks.set(kioskId, {
     kioskId,
-    displayName: kioskSettings.get(kioskId)?.displayName ?? kioskId,
+    displayName: kioskSettings.get(kioskId)?.displayName ?? "Dispatch Network",
     socketId,
     connectedAt: new Date(),
   });

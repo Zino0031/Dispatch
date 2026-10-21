@@ -94,6 +94,7 @@ export default function Home() {
   const [captureUrl, setCaptureUrl] = useState("");
   const [scanFilter, setScanFilter] = useState<ScanFilter>("auto");
   const [rotation, setRotation] = useState(0);
+  const [pages, setPages] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scanImgRef = useRef<HTMLImageElement | null>(null);
@@ -250,7 +251,14 @@ export default function Home() {
       const jobResponse = await fetch(`${url}/api/print-job`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kioskId: kiosk, fileUrl: uploaded.fileUrl, copies, color, duplex }),
+        body: JSON.stringify({
+        kioskId: kiosk,
+        fileUrl: uploaded.fileUrl,
+        copies,
+        color,
+        duplex,
+        ...(pages ? { pages } : {}),
+      }),
       });
       const job = (await jobResponse.json()) as { printJobId?: string; accessToken?: string; error?: string };
       if (!jobResponse.ok || !job.printJobId || !job.accessToken) throw new Error(job.error ?? "Could not create print job");
@@ -1201,6 +1209,59 @@ export default function Home() {
                   </div>
                 </div>
 
+                {fileKind(file) === "PDF" && (
+                  <div className="opt">
+                    <span className="opt-label">Pages</span>
+                    <div className="seg" role="radiogroup" aria-label="Pages">
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={pages === null}
+                        className={pages === null ? "active" : ""}
+                        onClick={() => setPages(null)}
+                      >
+                        All pages
+                      </button>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={pages !== null}
+                        className={pages !== null ? "active" : ""}
+                        onClick={() => setPages(pages !== null ? pages : "")}
+                      >
+                        Custom
+                      </button>
+                    </div>
+                    {pages !== null && (
+                      <>
+                        <input
+                          type="text"
+                          autoComplete="off"
+                          value={pages}
+                          onChange={(event) => setPages(event.target.value)}
+                          placeholder="e.g. 1-3, 5"
+                          aria-label="Page range"
+                          style={{
+                            width: "100%",
+                            border: 0,
+                            background: "transparent",
+                            color: "var(--ink)",
+                            fontWeight: 600,
+                            fontSize: 17,
+                            outline: "none",
+                            paddingLeft: 4,
+                          }}
+                        />
+                        <p
+                          className="format-disclaimer"
+                          style={{ marginTop: 6, fontSize: 11.5, color: "var(--muted)" }}
+                        >
+                          Comma-separated pages or ranges, e.g. 1-3, 5
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
                 <div className="opt opt-kiosk">
                   <span className="opt-label">Pickup kiosk · {kiosks.length || 0} online</span>
                   {kiosks.length ? (
@@ -1318,6 +1379,12 @@ export default function Home() {
                   <span>Total</span>
                   <strong>{total} DA</strong>
                 </div>
+                {pages && (
+                  <div className="send-row">
+                    <span>Pages</span>
+                    <strong>{pages}</strong>
+                  </div>
+                )}
               </div>
               <p className="format-disclaimer">
                 Test checkout only — no real payment is processed and no payment SDK is connected.
@@ -1391,6 +1458,12 @@ export default function Home() {
                     Edit
                   </button>
                 </div>
+                {pages && (
+                  <div className="send-row">
+                    <span>Pages</span>
+                    <strong>{pages}</strong>
+                  </div>
+                )}
               </div>
 
               {!done ? (

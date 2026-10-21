@@ -55,10 +55,20 @@ async function requireDefaultPrinter(): Promise<void> {
 
 export async function printWithCups(
   filePath: string,
-  options: { copies: number; color: PrintColor; duplex: boolean; jobId: string },
+  options: {
+    copies: number;
+    color: PrintColor;
+    duplex: boolean;
+    jobId: string;
+    pages?: string;
+  },
 ): Promise<void> {
   await requireDefaultPrinter();
   const args = ["-t", `Print Kiosk ${options.jobId}`, "-n", String(options.copies)];
+  // Only print the requested page range when the job specifies one; otherwise all pages.
+  if (options.pages) {
+    args.push("-o", `page-ranges=${options.pages}`);
+  }
   // Avoid driver-specific ColorModel options; the default printer profile handles color.
   if (options.duplex) {
     args.push("-o", "sides=two-sided-long-edge");
