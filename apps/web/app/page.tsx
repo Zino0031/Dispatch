@@ -683,7 +683,7 @@ export default function Home() {
             <span>PK</span>
           </span>
         )}
-        <strong className="app-title">Campus Print</strong>
+        <strong className="app-title">Dispatch Network</strong>
         <span className="kiosk-pill" title={kiosks.length ? `${kiosks.length} kiosk(s) online` : "No kiosks online"}>
           <span className={`fleet-dot ${kiosks.length ? "online" : "offline"}`} />
           {kiosks.length ? `${kiosks.length} online` : "Offline"}
@@ -1092,7 +1092,7 @@ export default function Home() {
               <p className="format-disclaimer">
                 {mode === "copy"
                   ? "Auto-enhance clears shadows and boosts contrast like a scanner app. Rotate if the photo is sideways."
-                  : "Campus printers accept PDF, JPG, PNG and Word. Word preview is approximate — the original is what prints."}
+                  : "Dispatch Networkers accept PDF, JPG, PNG and Word. Word preview is approximate — the original is what prints."}
               </p>
             </section>
           )}
@@ -1522,7 +1522,7 @@ export default function Home() {
       </section>
 
       <footer className="foot">
-        <span>Campus print · self-service</span>
+        <span>Dispatch Network · self-service</span>
         <span>
           Need help? <a href="/admin">Open operations →</a>
         </span>

@@ -64,7 +64,7 @@ export default function AdminPage() {
   if (!authenticated) {
     return (
       <main className="admin-shell admin-login">
-        <div className="admin-brand"><span>PK</span><strong>Campus print / operations</strong></div>
+        <div className="admin-brand"><span>PK</span><strong>Dispatch Network / operations</strong></div>
         <section className="admin-login-panel">
           <p className="eyebrow">RESTRICTED AREA</p>
           <h1>Operations console</h1>
@@ -81,7 +81,7 @@ export default function AdminPage() {
 
   return (
     <main className="admin-shell">
-      <header className="admin-topbar"><div className="admin-brand"><span>PK</span><strong>Campus print / operations</strong></div><button className="admin-signout" onClick={() => { sessionStorage.removeItem("print-kiosk-admin-token"); setAuthenticated(false); setOverview(null); }}>Sign out</button></header>
+      <header className="admin-topbar"><div className="admin-brand"><span>PK</span><strong>Dispatch Network / operations</strong></div><button className="admin-signout" onClick={() => { sessionStorage.removeItem("print-kiosk-admin-token"); setAuthenticated(false); setOverview(null); }}>Sign out</button></header>
       <div className="admin-heading"><div><p className="eyebrow">LIVE CONTROL ROOM</p><h1>Kiosk overview</h1></div><button className="refresh-button" onClick={() => void loadOverview()}>Refresh ↻</button></div>
       <section className="metrics"><div><span>ONLINE KIOSKS</span><strong>{overview?.summary.kiosksOnline ?? 0}<small> / {overview?.kiosks.length ?? 0}</small></strong></div><div><span>ACTIVE JOBS</span><strong>{overview?.summary.jobsActive ?? 0}</strong></div><div><span>TOTAL JOBS</span><strong>{overview?.summary.jobsTotal ?? 0}</strong></div></section>
       <section className="admin-grid">

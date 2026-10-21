@@ -14,7 +14,7 @@ services:
       - key: PUBLIC_URL
         value: https://print-kiosk-backend-10xs.onrender.com
       - key: CORS_ORIGIN
-        value: https://print-kiosk-web-my-team29.vercel.app
+        value: https://dispatch-network.vercel.app
       - key: ADMIN_TOKEN
         generateValue: true
       - key: KIOSK_ENROLLMENT_TOKEN
