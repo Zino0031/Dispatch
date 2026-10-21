@@ -1,7 +1,7 @@
 # PRD — Automated Self-Service Printing Kiosk
 
 **Version:** 1.0 · **Date:** 2026-10-15 · **Status:** Phase 1 live (backend), Phase 2–4 in progress
-**Owner:** University campus print service · **Audience:** builders, operators, agents
+**Owner:** University Dispatch Network service · **Audience:** builders, operators, agents
 
 ## 1. Problem
 

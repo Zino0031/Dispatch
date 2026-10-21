@@ -1,6 +1,6 @@
  # Web application
 
-Next.js App Router client for the campus print workflow. The first slice provides
+Next.js App Router client for the Dispatch Network workflow. The first slice provides
 file selection, print options, online kiosk discovery, and a local status preview.
 
 Before submission, the browser previews PDFs in its built-in PDF viewer, images
