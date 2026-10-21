@@ -7,6 +7,7 @@ export interface NewPrintJobPayload {
   copies: number;
   color: PrintColor;
   duplex: boolean;
+  pages?: string;
 }
 
 export type KioskStatusEvent =
