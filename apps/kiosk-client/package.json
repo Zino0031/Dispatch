@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "identity": "tsx src/identity.ts",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
@@ -16,9 +18,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@swc/jest": "^0.2.39",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.18.1",
     "eslint": "^10.12.0",
-    "tsx": "^4.20.5",
+    "jest": "^30.5.2",
+    "ts-jest": "^29.4.15",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.71.2"
   }

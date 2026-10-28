@@ -17,3 +17,12 @@ export type KioskStatusEvent =
   | "PRINT_SUCCESS"
   | "ERROR"
   | "PRINTER_ERROR";
+
+export const KIOSK_STATUS_EVENTS: KioskStatusEvent[] = [
+  "DOWNLOAD_START",
+  "DOWNLOAD_COMPLETE",
+  "PRINTING_STARTED",
+  "PRINT_SUCCESS",
+  "ERROR",
+  "PRINTER_ERROR",
+];

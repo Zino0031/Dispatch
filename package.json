@@ -1,0 +1,14 @@
+{
+  "name": "print-kiosk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Automated self-service printing kiosk",
+  "scripts": {
+    "check-contracts": "bash scripts/check-contracts.sh",
+    "ci-smoke": "bash scripts/ci-smoke.sh"
+  },
+  "scripts": {
+    "check-contracts": "bash scripts/check-contracts.sh",
+    "ci-smoke": "bash scripts/ci-smoke.sh"
+  }
+}
