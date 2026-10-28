@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { isAllowedCorsOrigin } from './config.ts';
+import { isAllowedCorsOrigin } from './config';
 
 describe('config', () => {
   describe('isAllowedCorsOrigin', () => {

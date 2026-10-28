@@ -1,9 +1,9 @@
 import { describe, it, expect } from '@jest/globals';
-import { hashKioskToken, verifyKioskToken } from './kioskAuth.ts';
+import { hashKioskToken, verifyKioskToken } from './kioskAuth';
 
 describe('kioskAuth', () => {
   describe('hashKioskToken', () => {
-    it('should produce a salt:hash string', () => {
+    it('should generate a salt:hash string', () => {
       const hashed = hashKioskToken('my-secret-token');
       const parts = hashed.split(':');
       expect(parts).toHaveLength(2);

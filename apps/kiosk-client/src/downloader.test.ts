@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { downloadDocument } from './downloader.ts';
+import { downloadDocument } from './downloader';
 
 describe('downloader', () => {
   const tempDir = '/tmp/kiosk-test';
