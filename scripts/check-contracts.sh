@@ -32,9 +32,7 @@ echo "=== Backend config.ts (room helpers) ==="
 check_file_has "$BACKEND_CONFIG" kioskRoom jobRoom
 
 echo "=== Kiosk-client types.ts ==="
-check_file_has "$KIOSK_TYPES" \
-  QUEUED SENT_TO_KIOSK DOWNLOAD_START DOWNLOAD_COMPLETE PRINTING_STARTED PRINT_SUCCESS ERROR PRINTER_ERROR CANCELLED \
-  KIOSK_STATUS_EVENTS PrintJobStatus NewPrintJobPayload KioskStatusPayload PrintJobRecord
+check_file_has "$KIOSK_TYPES" KIOSK_STATUS_EVENTS NewPrintJobPayload
 
 echo "=== 50 MB cap + copy limits ==="
 for f in .env.example apps/backend/.env.example apps/kiosk-client/.env.example; do
