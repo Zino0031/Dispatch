@@ -2,7 +2,6 @@ import { describe, it, expect } from '@jest/globals';
 import { downloadDocument } from './downloader';
 
 describe('downloader', () => {
-  const testUrl = 'https://example.com/document.pdf';
   const tempDir = '/tmp/kiosk-test';
   const jobId = 'test-job-123';
 
