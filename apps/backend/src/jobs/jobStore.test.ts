@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { JobStore } from './jobStore.ts';
-import type { PrintJobStatus } from '../types.ts';
 
 describe('JobStore', () => {
   let store: JobStore;
