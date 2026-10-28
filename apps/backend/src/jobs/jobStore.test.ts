@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { JobStore } from './jobStore.ts';
+import { JobStore } from './jobStore';
 
 describe('JobStore', () => {
   let store: JobStore;
@@ -62,7 +62,6 @@ describe('JobStore', () => {
         color: 'bw',
         duplex: false,
       });
-      // Small delay to ensure different timestamps
       const start = Date.now();
       while (Date.now() - start < 5) {
         // busy wait
@@ -128,10 +127,12 @@ describe('JobStore', () => {
       const updated = store.updateStatus(job.printJobId, 'SENT_TO_KIOSK');
 
       expect(updated).toBeDefined();
-      expect(updated.status).toBe('SENT_TO_KIOSK');
-      expect(updated.history).toHaveLength(2);
-      expect(updated.history[1].status).toBe('SENT_TO_KIOSK');
-      expect(updated.history[1].at).toBeDefined();
+      if (updated) {
+        expect(updated.status).toBe('SENT_TO_KIOSK');
+        expect(updated.history).toHaveLength(2);
+        expect(updated.history[1].status).toBe('SENT_TO_KIOSK');
+        expect(updated.history[1].at).toBeDefined();
+      }
     });
 
     it('should return undefined for a nonexistent job', () => {
