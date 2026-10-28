@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { normalizeForPrinting } from './documentNormalizer.ts';
+import { normalizeForPrinting } from './documentNormalizer';
 
 describe('documentNormalizer', () => {
   it('should pass through non-DOC/DOCX files unchanged', async () => {
