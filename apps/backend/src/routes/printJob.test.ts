@@ -135,7 +135,7 @@ describe('print job zod schema', () => {
         duplex: false,
         pages,
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(false, `Should reject pages: ${pages}`);
     }
   });
 });

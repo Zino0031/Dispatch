@@ -3,7 +3,7 @@ import { hashKioskToken, verifyKioskToken } from './kioskAuth';
 
 describe('kioskAuth', () => {
   describe('hashKioskToken', () => {
-    it('should generate a salt:hash string', () => {
+    it('should produce a salt:hash string', () => {
       const hashed = hashKioskToken('my-secret-token');
       const parts = hashed.split(':');
       expect(parts).toHaveLength(2);

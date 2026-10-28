@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { JobStore } from './jobStore';
+import { JobStore } from './jobStore.js';
 
 describe('JobStore', () => {
   let store: JobStore;
@@ -62,10 +62,6 @@ describe('JobStore', () => {
         color: 'bw',
         duplex: false,
       });
-      const start = Date.now();
-      while (Date.now() - start < 5) {
-        // busy wait
-      }
       const job2 = store.create({
         kioskId: 'kiosk-2',
         fileUrl: 'https://example.com/file2.pdf',
