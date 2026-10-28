@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { hashKioskToken, verifyKioskToken } from './kioskAuth';
+import { hashKioskToken, verifyKioskToken } from './kioskAuth.js';
 
 describe('kioskAuth', () => {
   describe('hashKioskToken', () => {
